@@ -9,6 +9,10 @@ module id_stage(
     //from fs
     input                          fs_to_ds_valid,
     input  [`FS_TO_DS_BUS_WD -1:0] fs_to_ds_bus  ,
+    //from es raw
+    input  [`ES_TO_DS_BUS_WD -1:0] es_to_ds_bus,
+    //from ms raw
+    input  [`MS_TO_DS_BUS_WD -1:0] ms_to_ds_bus,
     //to es
     output                         ds_to_es_valid,
     output [`DS_TO_ES_BUS_WD -1:0] ds_to_es_bus  ,
@@ -30,6 +34,13 @@ wire [31:0] ds_pc  ;
 assign {ds_inst,
         ds_pc  } = fs_to_ds_bus_r;
 
+wire [4:0] es_dest;
+wire [4:0] ms_dest;
+wire [4:0] ws_dest;
+assign es_dest = es_to_ds_bus;
+assign ms_dest = ms_to_ds_bus;
+assign ws_dest = {5{ws_to_rf_bus[37]}} & ws_to_rf_bus[36:32];
+
 wire        rf_we   ;
 wire [ 4:0] rf_waddr;
 wire [31:0] rf_wdata;
@@ -38,6 +49,7 @@ assign {rf_we   ,  //37:37
         rf_wdata   //31:0
        } = ws_to_rf_bus;
 
+wire        br_stall;
 wire        br_taken;
 wire [31:0] br_target;
 
@@ -116,10 +128,85 @@ assign ds_to_es_bus = {alu_op      ,  //135:124
                        ds_pc          //31 :0
                       };
 
-assign ds_ready_go    = 1'b1;
-assign ds_allowin     = !ds_valid || ds_ready_go && es_allowin;
+// ---Need block? begin---
 
-assign ds_to_es_valid = ds_valid && ds_ready_go;
+// if reg/dest == 0 ?
+wire rs_neq_0;
+wire rt_neq_0;
+wire es_dest_neq_0;
+wire ms_dest_neq_0;
+wire ws_dest_neq_0;
+// if(|a=0) neq=0
+assign rs_neq_0 = |rs;
+assign rt_neq_0 = |rt;
+assign es_dest_neq_0 = |es_dest;
+assign ms_dest_neq_0 = |ms_dest;
+assign ws_dest_neq_0 = |ws_dest;
+
+// if a_rx == b_dest ?
+wire rs_eq_es_dest;
+wire rt_eq_es_dest;
+wire rs_eq_ms_dest;
+wire rt_eq_ms_dest;
+wire rs_eq_ws_dest;
+wire rt_eq_ws_dest;
+// if(ab!=0 && a==b) eq=1
+assign rs_eq_es_dest = (rs_neq_0 & es_dest_neq_0) && (rs == es_dest); // rs
+assign rs_eq_ms_dest = (rs_neq_0 & ms_dest_neq_0) && (rs == ms_dest);
+assign rs_eq_ws_dest = (rs_neq_0 & ws_dest_neq_0) && (rs == ws_dest);
+assign rt_eq_es_dest = (rt_neq_0 & es_dest_neq_0) && (rt == es_dest); // rt
+assign rt_eq_ms_dest = (rt_neq_0 & ms_dest_neq_0) && (rt == ms_dest);
+assign rt_eq_ws_dest = (rt_neq_0 & ws_dest_neq_0) && (rt == ws_dest);
+
+// Type define for block situation
+// if current type (i.e. at decode stage) has any src from reg
+// 19=10+3+4+2
+wire type_st;
+wire type_rs;
+wire type_rt;
+wire type_nr;
+                            // src from rs & rt
+assign type_st = inst_addu  // (op)[rs, rt] -> rd
+               | inst_subu  // ...
+               | inst_and   // ...
+               | inst_nor   // ...
+               | inst_or    // ...
+               | inst_xor   // ...
+               | inst_slt   // ...
+               | inst_sltu  // ...
+               | inst_beq   // (op)[rs, rt] -> br_taken
+               | inst_bne;  // ...
+                            // src from rs
+assign type_rs = inst_addiu // (op)[rs] -> rt
+               | inst_lw    // ...
+               | inst_jr;   // j [rs]
+                            // src from rt
+assign type_rt = inst_sw    // (op)[rt] -> mem
+               | inst_sll   // (op)[rt] -> rd
+               | inst_sra   // ...
+               | inst_srl;  // ...
+                            // No src from reg
+assign type_nr = inst_lui   // (op)imm -> rt
+               | inst_jal;  // (op)PC+8 -> GPR[31]
+
+// if rx == dests?
+wire rs_eq_dests;
+wire rt_eq_dests;
+wire st_eq_dests;
+// rs+rt=st
+assign rs_eq_dests = rs_eq_es_dest | rs_eq_ms_dest | rs_eq_ws_dest;
+assign rt_eq_dests = rt_eq_es_dest | rt_eq_ms_dest | rt_eq_ws_dest;
+assign st_eq_dests = rs_eq_dests   | rt_eq_dests   ;
+
+// signal generate
+assign ds_ready_go    =  type_st & ~st_eq_dests
+                      || type_rs & ~rs_eq_dests
+                      || type_rt & ~rt_eq_dests
+                      || type_nr ;
+// ---Need block? end---
+
+assign ds_allowin     = !ds_valid || ds_ready_go && es_allowin;
+assign ds_to_es_valid =  ds_valid && ds_ready_go;
 always @(posedge clk) begin
 //edit1begin
     if (reset) begin
@@ -198,7 +285,7 @@ assign mem_we       = inst_sw;
 
 assign dest         = dst_is_r31 ? 5'd31 :
                       dst_is_rt  ? rt    :
-                                   rd;
+                                   rd    ;
 
 assign rf_raddr1 = rs;
 assign rf_raddr2 = rt;
@@ -217,13 +304,14 @@ assign rs_value = rf_rdata1;
 assign rt_value = rf_rdata2;
 
 assign rs_eq_rt = (rs_value == rt_value);
+assign br_stall = (inst_beq || inst_bne ) & st_eq_dests;
 assign br_taken = (   inst_beq  &&  rs_eq_rt
                    || inst_bne  && !rs_eq_rt
                    || inst_jal
-                   || inst_jr
-                  ) && ds_valid;
-assign br_target = (inst_beq || inst_bne) ? (fs_pc + {{14{imm[15]}}, imm[15:0], 2'b0}) :
-                   (inst_jr)              ? rs_value :
-                  /*inst_jal*/              {fs_pc[31:28], jidx[25:0], 2'b0};
+                   || inst_jr) && ds_valid;
+assign br_target = ( inst_beq
+                   | inst_bne) ? (fs_pc + {{14{imm[15]}}, imm[15:0], 2'b0}) :
+                    (inst_jr ) ?  rs_value :
+                   /*inst_jal*/  {fs_pc[31:28], jidx[25:0], 2'b0};
 
 endmodule

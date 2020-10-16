@@ -5,18 +5,18 @@ module alu(
   output [31:0] alu_result
 );
 
-wire op_add;   //加法操作
-wire op_sub;   //减法操作
-wire op_slt;   //有符号比较，小于置位
-wire op_sltu;  //无符号比较，小于置位
-wire op_and;   //按位与
-wire op_nor;   //按位或非
-wire op_or;    //按位或
-wire op_xor;   //按位异或
-wire op_sll;   //逻辑左移
-wire op_srl;   //逻辑右移
-wire op_sra;   //算术右移
-wire op_lui;   //立即数置于高半部分
+wire op_add;   // ADD
+wire op_sub;   // SUB
+wire op_slt;   // SLT : Set on Less Than
+wire op_sltu;  // SLTU: Set on Less Than Unsigned
+wire op_and;   // AND
+wire op_nor;   // NOR
+wire op_or;    // OR
+wire op_xor;   // XOR
+wire op_sll;   // SLL : Shift Word Left  Logical
+wire op_srl;   // SRL : Shift Word Right Logical
+wire op_sra;   // SRA : Shift Word Right Arithmetical
+wire op_lui;   // LUI : Load Upper Immediate
 
 // control code decomposition
 assign op_add  = alu_op[ 0];

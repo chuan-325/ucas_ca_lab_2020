@@ -17,7 +17,7 @@ module decoder_6_64(
 );
 
 genvar i;
-generate for (i=0; i<63; i=i+1) begin : gen_for_dec_6_64
+generate for (i=0; i<64; i=i+1) begin : gen_for_dec_6_64 // lab3-edit8:63->64
     assign out[i] = (in == i);
 end endgenerate
 

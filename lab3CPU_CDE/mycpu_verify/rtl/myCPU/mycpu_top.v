@@ -37,6 +37,11 @@ wire [`ES_TO_MS_BUS_WD -1:0] es_to_ms_bus;
 wire [`MS_TO_WS_BUS_WD -1:0] ms_to_ws_bus;
 wire [`WS_TO_RF_BUS_WD -1:0] ws_to_rf_bus;
 wire [`BR_BUS_WD       -1:0] br_bus;
+//from es raw
+wire  [`ES_TO_DS_BUS_WD -1:0] es_to_ds_bus;
+//from ms raw
+wire  [`MS_TO_DS_BUS_WD -1:0] ms_to_ds_bus;
+
 
 // IF stage
 if_stage if_stage(
@@ -66,6 +71,10 @@ id_stage id_stage(
     //from fs
     .fs_to_ds_valid (fs_to_ds_valid ),
     .fs_to_ds_bus   (fs_to_ds_bus   ),
+    //from es raw
+    .es_to_ds_bus   (es_to_ds_bus   ),
+    //from ms raw
+    .ms_to_ds_bus   (ms_to_ds_bus   ),
     //to es
     .ds_to_es_valid (ds_to_es_valid ),
     .ds_to_es_bus   (ds_to_es_bus   ),
@@ -87,6 +96,8 @@ exe_stage exe_stage(
     //to ms
     .es_to_ms_valid (es_to_ms_valid ),
     .es_to_ms_bus   (es_to_ms_bus   ),
+    //to ds raw
+    .es_to_ds_bus   (es_to_ds_bus   ),
     // data sram interface
     .data_sram_en   (data_sram_en   ),
     .data_sram_wen  (data_sram_wen  ),
@@ -106,6 +117,8 @@ mem_stage mem_stage(
     //to ws
     .ms_to_ws_valid (ms_to_ws_valid ),
     .ms_to_ws_bus   (ms_to_ws_bus   ),
+    //to ds raw
+    .ms_to_ds_bus   (ms_to_ds_bus   ),
     //from data-sram
     .data_sram_rdata(data_sram_rdata)
 );
