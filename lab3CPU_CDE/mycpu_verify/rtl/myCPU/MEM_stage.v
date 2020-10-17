@@ -43,7 +43,9 @@ assign ms_to_ws_bus = {ms_gr_we       ,  //69:69
                        ms_pc             //31:0
                       };
 assign ms_to_ds_bus = {`MS_TO_DS_BUS_WD{ ms_valid
-                                       & ms_gr_we}} & ms_dest;
+                                       & ms_gr_we}} & {ms_dest,         // 36:32 ms_dest
+                                                       ms_final_result  // 31: 0 ms_res
+                                                      };
 
 assign ms_ready_go    = 1'b1;
 assign ms_allowin     = !ms_valid || ms_ready_go && ws_allowin;

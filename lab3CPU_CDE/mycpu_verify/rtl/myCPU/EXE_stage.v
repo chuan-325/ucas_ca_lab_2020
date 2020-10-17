@@ -66,8 +66,11 @@ assign es_to_ms_bus = {es_res_from_mem,  //70:70
                        es_alu_result  ,  //63:32
                        es_pc             //31:0
                       };
-assign es_to_ds_bus = {`ES_TO_DS_BUS_WD{es_valid
-                                      & es_gr_we}} & es_dest;
+assign es_to_ds_bus = {`ES_TO_DS_BUS_WD{ es_valid
+                                       & es_gr_we}} & {~es_res_from_mem, //37    es_res_valid
+                                                        es_dest,         //36:32 es_dest
+                                                        es_alu_result    //31: 0 es_res
+                                                        };
 
 assign es_ready_go    = 1'b1;
 assign es_allowin     = !es_valid || es_ready_go && ms_allowin;

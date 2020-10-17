@@ -35,8 +35,8 @@ wire        rf_we;
 wire [4 :0] rf_waddr;
 wire [31:0] rf_wdata;
 assign ws_to_rf_bus = {rf_we   ,  //37:37
-                       rf_waddr,  //36:32
-                       rf_wdata   //31:0
+                       rf_waddr,  //36:32 dest
+                       rf_wdata   //31:0  wdata
                       };
 
 assign ws_ready_go = 1'b1;

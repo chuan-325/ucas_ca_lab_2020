@@ -34,13 +34,6 @@ wire [31:0] ds_pc  ;
 assign {ds_inst,
         ds_pc  } = fs_to_ds_bus_r;
 
-wire [4:0] es_dest;
-wire [4:0] ms_dest;
-wire [4:0] ws_dest;
-assign es_dest = es_to_ds_bus;
-assign ms_dest = ms_to_ds_bus;
-assign ws_dest = {5{ws_to_rf_bus[37]}} & ws_to_rf_bus[36:32];
-
 wire        rf_we   ;
 wire [ 4:0] rf_waddr;
 wire [31:0] rf_wdata;
@@ -48,6 +41,20 @@ assign {rf_we   ,  //37:37
         rf_waddr,  //36:32
         rf_wdata   //31:0
        } = ws_to_rf_bus;
+
+wire es_res_valid;
+assign es_res_valid = es_to_ds_bus[37];
+
+wire [ 4:0] es_dest;
+wire [ 4:0] ms_dest;
+wire [ 4:0] ws_dest;
+wire [31:0] es_res;
+wire [31:0] ms_res;
+assign es_dest = es_to_ds_bus[36:32]  ;
+assign ms_dest = ms_to_ds_bus[36:32]  ;
+assign ws_dest = rf_waddr & {5{rf_we}};
+assign es_res  = es_to_ds_bus[31:0];
+assign ms_res  = ms_to_ds_bus[31:0];
 
 wire        br_stall;
 wire        br_taken;
@@ -128,7 +135,7 @@ assign ds_to_es_bus = {alu_op      ,  //135:124
                        ds_pc          //31 :0
                       };
 
-// ---Need block? begin---
+/*---Need block? begin---*/
 
 // if reg/dest == 0 ?
 wire rs_neq_0;
@@ -150,6 +157,7 @@ wire rs_eq_ms_dest;
 wire rt_eq_ms_dest;
 wire rs_eq_ws_dest;
 wire rt_eq_ws_dest;
+wire st_eq_es_dest; //st(@es)
 // if(ab!=0 && a==b) eq=1
 assign rs_eq_es_dest = (rs_neq_0 & es_dest_neq_0) && (rs == es_dest); // rs
 assign rs_eq_ms_dest = (rs_neq_0 & ms_dest_neq_0) && (rs == ms_dest);
@@ -157,6 +165,7 @@ assign rs_eq_ws_dest = (rs_neq_0 & ws_dest_neq_0) && (rs == ws_dest);
 assign rt_eq_es_dest = (rt_neq_0 & es_dest_neq_0) && (rt == es_dest); // rt
 assign rt_eq_ms_dest = (rt_neq_0 & ms_dest_neq_0) && (rt == ms_dest);
 assign rt_eq_ws_dest = (rt_neq_0 & ws_dest_neq_0) && (rt == ws_dest);
+assign st_eq_es_dest = rs_eq_es_dest | rt_eq_es_dest;                 // st(@es)
 
 // Type define for block situation
 // if current type (i.e. at decode stage) has any src from reg
@@ -198,12 +207,21 @@ assign rs_eq_dests = rs_eq_es_dest | rs_eq_ms_dest | rs_eq_ws_dest;
 assign rt_eq_dests = rt_eq_es_dest | rt_eq_ms_dest | rt_eq_ws_dest;
 assign st_eq_dests = rs_eq_dests   | rt_eq_dests   ;
 
-// signal generate
+// signal generate in ds_ready_go
+// With Bypass Tech: only block when src_reg crash with a load_type inst(@es)
+assign ds_ready_go = es_res_valid
+                   | ~( rs_eq_es_dest & type_rs
+                      | rt_eq_es_dest & type_rt
+                      | st_eq_es_dest & type_st
+                      );
+// Without Bypass Tech
+/*
 assign ds_ready_go    =  type_st & ~st_eq_dests
                       || type_rs & ~rs_eq_dests
                       || type_rt & ~rt_eq_dests
                       || type_nr ;
-// ---Need block? end---
+*/
+/*---Need block? end---*/
 
 assign ds_allowin     = !ds_valid || ds_ready_go && es_allowin;
 assign ds_to_es_valid =  ds_valid && ds_ready_go;
@@ -300,8 +318,15 @@ regfile u_regfile(
     .wdata  (rf_wdata )
     );
 
-assign rs_value = rf_rdata1;
-assign rt_value = rf_rdata2;
+// Fowarding(Bypass) Added
+assign rs_value = rs_eq_es_dest ? es_res   :
+                  rs_eq_ms_dest ? ms_res   :
+                  rs_eq_ws_dest ? rf_wdata :
+                                  rf_rdata1;
+assign rt_value = rt_eq_es_dest ? es_res   :
+                  rt_eq_ms_dest ? ms_res   :
+                  rt_eq_ws_dest ? rf_wdata :
+                                  rf_rdata2;
 
 assign rs_eq_rt = (rs_value == rt_value);
 assign br_stall = (inst_beq || inst_bne ) & st_eq_dests;
