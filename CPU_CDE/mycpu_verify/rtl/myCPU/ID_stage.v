@@ -118,7 +118,7 @@ wire [31:0] rf_rdata2;
 
 wire        rs_eq_rt;
 
-assign br_bus       = {br_taken,br_target};
+assign br_bus       = {br_stall, br_taken, br_target};
 
 assign ds_to_es_bus = {alu_op      ,  //135:124
                        load_op     ,  //123:123
@@ -329,7 +329,7 @@ assign rt_value = rt_eq_es_dest ? es_res   :
                                   rf_rdata2;
 
 assign rs_eq_rt = (rs_value == rt_value);
-assign br_stall = (inst_beq || inst_bne ) & st_eq_dests;
+assign br_stall = 1'b0;// (inst_beq || inst_bne ) & st_eq_dests;
 assign br_taken = (   inst_beq  &&  rs_eq_rt
                    || inst_bne  && !rs_eq_rt
                    || inst_jal

@@ -39,7 +39,7 @@ assign fs_to_ds_bus = {fs_inst ,
 
 // pre-IF stage
 assign to_fs_ready_go = ~br_stall;
-assign to_fs_valid    = ~reset && to_fs_ready_go;
+assign to_fs_valid    = ~reset && to_fs_ready_go; // edited later in axi
 assign seq_pc         = fs_pc + 3'h4;
 assign nextpc         = br_taken ? br_target : seq_pc;
 
