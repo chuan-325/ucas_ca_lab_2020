@@ -107,6 +107,16 @@ wire        inst_beq;
 wire        inst_bne;
 wire        inst_jal;
 wire        inst_jr;
+//lab6 newly added: mult & div
+wire        inst_mult;
+wire        inst_multu;
+wire        inst_div;
+wire        inst_divu;
+//lab6 newly added: mov [f/t] <hi/lo>
+wire        inst_mfhi;
+wire        inst_mflo;
+wire        inst_mthi;
+wire        inst_mtlo;
 
 wire        dst_is_r31;
 wire        dst_is_rt;
@@ -118,17 +128,25 @@ wire [31:0] rf_rdata2;
 
 wire        rs_eq_rt;
 
-assign br_bus       = {br_stall, br_taken, br_target};
-
-assign ds_to_es_bus = {alu_op      ,  //135:124
+assign br_bus       = {br_stall, br_taken, br_target}; // correct error from lab4
+// lab6: add ops(>135)
+assign ds_to_es_bus = {inst_mtlo,     //143     | op
+                       inst_mthi,     //142
+                       inst_mflo,     //141
+                       inst_mfhi,     //140
+                       inst_divu,     //139
+                       inst_div,      //138
+                       inst_multu,    //137
+                       inst_mult,     //136
+                       alu_op      ,  //135:124
                        load_op     ,  //123:123
-                       src1_is_sa  ,  //122:122
+                       src1_is_sa  ,  //122:122  | src
                        src1_is_pc  ,  //121:121
                        src2_is_imm ,  //120:120
                        src2_is_8   ,  //119:119
-                       gr_we       ,  //118:118
+                       gr_we       ,  //118:118  | we
                        mem_we      ,  //117:117
-                       dest        ,  //116:112
+                       dest        ,  //116:112  | val
                        imm         ,  //111:96
                        rs_value    ,  //95 :64
                        rt_value    ,  //63 :32
@@ -136,7 +154,6 @@ assign ds_to_es_bus = {alu_op      ,  //135:124
                       };
 
 /*---Need block? begin---*/
-
 // if reg/dest == 0 ?
 wire rs_neq_0;
 wire rt_neq_0;
@@ -169,7 +186,6 @@ assign st_eq_es_dest = rs_eq_es_dest | rt_eq_es_dest;                 // st(@es)
 
 // Type define for block situation
 // if current type (i.e. at decode stage) has any src from reg
-// 19=10+3+4+2
 wire type_st;
 wire type_rs;
 wire type_rt;
@@ -184,11 +200,17 @@ assign type_st = inst_addu  // (op)[rs, rt] -> rd
                | inst_slt   // ...
                | inst_sltu  // ...
                | inst_beq   // (op)[rs, rt] -> br_taken
-               | inst_bne;  // ...
+               | inst_bne   // ...
+               | inst_mult  // (op)[rs, rt] -> HI, LO
+               | inst_multu // ...
+               | inst_div   // ...
+               | inst_divu;
                             // src from rs
 assign type_rs = inst_addiu // (op)[rs] -> rt
                | inst_lw    // ...
-               | inst_jr;   // j [rs]
+               | inst_jr    // j [rs]
+               | inst_mthi  // mov [rs] -> HI, LO
+               | inst_mtlo; // ...
                             // src from rt
 assign type_rt = inst_sw    // (op)[rt] -> mem
                | inst_sll   // (op)[rt] -> rd
@@ -274,21 +296,29 @@ assign inst_beq    = op_d[6'h04];
 assign inst_bne    = op_d[6'h05];
 assign inst_jal    = op_d[6'h03];
 assign inst_jr     = op_d[6'h00] & func_d[6'h08] & rt_d[5'h00] & rd_d[5'h00] & sa_d[5'h00];
+//lab6 newly added: mult & div
+assign inst_mult   = op_d[6'h00] & func_d[6'h18] & sa_d[5'h00];
+assign inst_multu  = op_d[6'h00] & func_d[6'h19] & sa_d[5'h00];
+assign inst_div    = op_d[6'h00] & func_d[6'h1a] & sa_d[5'h00];
+assign inst_divu   = op_d[6'h00] & func_d[6'h1b] & sa_d[5'h00];
+assign inst_mfhi   = op_d[6'h00] & func_d[6'h10] & sa_d[5'h00];
+assign inst_mflo   = op_d[6'h00] & func_d[6'h12] & sa_d[5'h00];
+assign inst_mthi   = op_d[6'h00] & func_d[6'h11] & sa_d[5'h00];
+assign inst_mtlo   = op_d[6'h00] & func_d[6'h13] & sa_d[5'h00];
 
 assign alu_op[ 0] = inst_addu | inst_addiu | inst_lw | inst_sw | inst_jal;
-assign alu_op[ 1] = inst_subu;
-assign alu_op[ 2] = inst_slt;
-assign alu_op[ 3] = inst_sltu;
-assign alu_op[ 4] = inst_and;
-assign alu_op[ 5] = inst_nor;
-assign alu_op[ 6] = inst_or;
-assign alu_op[ 7] = inst_xor;
-assign alu_op[ 8] = inst_sll;
-assign alu_op[ 9] = inst_srl;
-assign alu_op[10] = inst_sra;
-assign alu_op[11] = inst_lui;
+assign alu_op[ 1] = inst_subu ;
+assign alu_op[ 2] = inst_slt  ;
+assign alu_op[ 3] = inst_sltu ;
+assign alu_op[ 4] = inst_and  ;
+assign alu_op[ 5] = inst_nor  ;
+assign alu_op[ 6] = inst_or   ;
+assign alu_op[ 7] = inst_xor  ;
+assign alu_op[ 8] = inst_sll  ;
+assign alu_op[ 9] = inst_srl  ;
+assign alu_op[10] = inst_sra  ;
+assign alu_op[11] = inst_lui  ;
 
-//edit2
 assign load_op = res_from_mem;
 
 assign src1_is_sa   = inst_sll   | inst_srl | inst_sra;
@@ -298,7 +328,12 @@ assign src2_is_8    = inst_jal;
 assign res_from_mem = inst_lw;
 assign dst_is_r31   = inst_jal;
 assign dst_is_rt    = inst_addiu | inst_lui | inst_lw;
-assign gr_we        = ~inst_sw & ~inst_beq & ~inst_bne & ~inst_jr;
+assign gr_we        = ~|{inst_sw, inst_beq, inst_bne, inst_jr,
+                         inst_mult, inst_multu, // lab6 added
+                         inst_div, inst_divu,
+                         inst_mthi, inst_mtlo
+                        };
+
 assign mem_we       = inst_sw;
 
 assign dest         = dst_is_r31 ? 5'd31 :
@@ -329,7 +364,7 @@ assign rt_value = rt_eq_es_dest ? es_res   :
                                   rf_rdata2;
 
 assign rs_eq_rt = (rs_value == rt_value);
-assign br_stall = 1'b0;// (inst_beq || inst_bne ) & st_eq_dests;
+assign br_stall = 1'b0; //(inst_beq || inst_bne ) & st_eq_dests;
 assign br_taken = (   inst_beq  &&  rs_eq_rt
                    || inst_bne  && !rs_eq_rt
                    || inst_jal
