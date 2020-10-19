@@ -164,9 +164,6 @@ reg es_div_sor_valid;
 wire es_div_sor_ready;
 wire es_div_out_valid;
 reg es_div_in_shkhd; // shakehand
-// div src ready
-assign es_div_end_ready = es_op_div;
-assign es_div_sor_ready = es_op_div;
 // div input sending valid
 wire es_div_in_ready;
 assign es_div_in_ready = es_div_end_ready & es_div_sor_ready;
@@ -200,9 +197,6 @@ reg es_divu_sor_valid;
 wire es_divu_sor_ready;
 wire es_divu_out_valid;
 reg es_divu_in_shkhd; // shakehand
-// divu src ready
-assign es_divu_end_ready = es_op_divu;
-assign es_divu_sor_ready = es_op_divu;
 // divu input sending valid
 wire es_divu_in_ready;
 assign es_divu_in_ready = es_divu_end_ready & es_divu_sor_ready;
