@@ -141,7 +141,7 @@ assign es_alu_src2 = es_src2_is_imm ? es_alu_src2_imm       :
 /* lab6 33-bit multiplier: begin */
 wire [32:0] es_mult_a;
 wire [32:0] es_mult_b;
-wire [66:0] es_mult_result;
+wire [65:0] es_mult_result;
 
 assign es_mult_a    = {es_op_mult & es_alu_src1[31], es_alu_src1};
 assign es_mult_b    = {es_op_mult & es_alu_src2[31], es_alu_src2};
