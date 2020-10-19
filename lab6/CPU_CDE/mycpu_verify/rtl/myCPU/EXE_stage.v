@@ -1,24 +1,24 @@
 `include "mycpu.h"
 
 module exe_stage(
-    input                          clk           ,
-    input                          reset         ,
+    input                          clk            ,
+    input                          reset          ,
     //allowin
-    input                          ms_allowin    ,
-    output                         es_allowin    ,
+    input                          ms_allowin     ,
+    output                         es_allowin     ,
     //from ds
-    input                          ds_to_es_valid,
-    input  [`DS_TO_ES_BUS_WD -1:0] ds_to_es_bus  ,
+    input                          ds_to_es_valid ,
+    input  [`DS_TO_ES_BUS_WD -1:0] ds_to_es_bus   ,
     //to ms
-    output                         es_to_ms_valid,
-    output [`ES_TO_MS_BUS_WD -1:0] es_to_ms_bus  ,
+    output                         es_to_ms_valid ,
+    output [`ES_TO_MS_BUS_WD -1:0] es_to_ms_bus   ,
     // to ds
-    output [`ES_TO_DS_BUS_WD -1:0] es_to_ds_bus  ,
+    output [`ES_TO_DS_BUS_WD -1:0] es_to_ds_bus   ,
     // data sram interface
-    output        data_sram_en   ,
-    output [ 3:0] data_sram_wen  ,
-    output [31:0] data_sram_addr ,
-    output [31:0] data_sram_wdata
+    output                         data_sram_en   ,
+    output [ 3:0]                  data_sram_wen  ,
+    output [31:0]                  data_sram_addr ,
+    output [31:0]                  data_sram_wdata
 );
 
 reg         es_valid      ;
@@ -29,6 +29,7 @@ reg [31:0] hi;
 reg [31:0] lo;
 
 reg  [`DS_TO_ES_BUS_WD -1:0] ds_to_es_bus_r;
+
 /* lab6 new ops begin */
 wire        es_inst_mtlo  ;
 wire        es_inst_mthi  ;
@@ -78,9 +79,11 @@ assign {es_inst_mtlo   ,  //143
 wire [31:0] es_alu_src1  ;
 wire [31:0] es_alu_src2  ;
 wire [31:0] es_alu_result;
-wire [31:0] es_res_r     ; // lab6
+wire [31:0] es_res_r     ;
+wire [31:0] es_hi_res    ;
+wire [31:0] es_lo_res    ;
 
-wire es_hilo_we; // lab6
+wire es_hilo_we;
 wire es_res_from_mem;
 
 assign es_res_from_mem = es_load_op;
@@ -96,8 +99,11 @@ assign es_to_ds_bus = {`ES_TO_DS_BUS_WD{ es_valid
                                                         es_res_r         //31: 0 es_res_r
                                                         };
 // lab6 es_ready_go change from 1'b1
-assign es_ready_go    = (|es_alu_op[11: 0])               //      basic ops: always immediately
-                      | (|es_alu_op[15:12]) & es_hilo_we; // mult & div ops: after write
+assign es_ready_go    = es_hilo_we | (~|{es_op_div,  // wait div to end
+                                         es_op_divu,
+                                         es_op_mult,
+                                         es_op_multu
+                                         });
 assign es_allowin     = !es_valid || es_ready_go && ms_allowin;
 assign es_to_ms_valid =  es_valid && es_ready_go;
 always @(posedge clk) begin
@@ -113,90 +119,115 @@ always @(posedge clk) begin
     end
 end
 
+// es_alu_src2: imm
+wire es_src2_is_uimm;
+wire [31:0] es_alu_src2_imm;
+assign es_src2_is_uimm = es_src2_is_imm & (es_alu_op[4] // andi
+                                          |es_alu_op[6] // ori
+                                          |es_alu_op[7] // xori
+                                          );
+assign es_alu_src2_imm[15: 0] = es_imm[15:0];
+assign es_alu_src2_imm[31:16] = {16{~es_src2_is_uimm // not uimm: imm[15]
+                                   & es_imm[15]}};   //     uimm: 0
+
 assign es_alu_src1 = es_src1_is_sa  ? {27'b0, es_imm[10:6]} :
                      es_src1_is_pc  ? es_pc[31:0]           :
                                       es_rs_value           ;
-assign es_alu_src2 = es_src2_is_imm ? {{16{es_imm[15]}}, es_imm[15:0]} :
-                     es_src2_is_8   ? 32'd8                            :
-                                      es_rt_value                      ;
+assign es_alu_src2 = es_src2_is_imm ? es_alu_src2_imm       :
+                     es_src2_is_8   ? 32'd8                 :
+                                      es_rt_value           ;
+
 
 /* lab6 33-bit multiplier: begin */
-wire [32:0] es_multer_a;
-wire [32:0] es_multer_b;
-wire [66:0] es_multer_result;
+wire [32:0] es_mult_a;
+wire [32:0] es_mult_b;
+wire [66:0] es_mult_result;
 
-assign es_multer_a      = {es_op_mult & es_alu_src1[32], es_alu_src1};
-assign es_multer_b      = {es_op_mult & es_alu_src2[32], es_alu_src2};
-assign es_multer_result = $signed(es_multer_a) * $signed(es_multer_b);
+assign es_mult_a    = {es_op_mult & es_alu_src1[31], es_alu_src1};
+assign es_mult_b    = {es_op_mult & es_alu_src2[31], es_alu_src2};
+assign es_mult_result = $signed(es_mult_a) * $signed(es_mult_b);
 /* lab6 33-bit multiplier: end */
 
 
 /* lab6 32-bit dividers (my_div, my_divu): begin */
+// Gerneral input
 wire [31:0] es_dividend;
 wire [31:0] es_divisor;
-// div
+assign es_dividend = {32{es_op_div|es_op_divu}} & es_alu_src1;
+assign es_divisor  = {32{es_op_div|es_op_divu}} & es_alu_src2;
+
+/* div begin */
 wire [63:0] es_div_dout;
 reg es_div_end_valid; // valid & ready
 wire es_div_end_ready;
 reg es_div_sor_valid;
 wire es_div_sor_ready;
-reg es_div_out_valid;
-// divu
+wire es_div_out_valid;
+reg es_div_in_shkhd; // shakehand
+// div src ready
+assign es_div_end_ready = es_op_div;
+assign es_div_sor_ready = es_op_div;
+// div input sending valid
+wire es_div_in_ready;
+assign es_div_in_ready = es_div_end_ready & es_div_sor_ready;
+
+always @(posedge clk ) begin
+    if (reset) begin                                   // reset
+        es_div_end_valid <= 1'b0;
+        es_div_sor_valid <= 1'b0;
+        es_div_in_shkhd  <= 1'b0;
+    end
+    else if (~es_div_in_shkhd & es_op_div) begin       // valid: require ready
+        es_div_end_valid <= 1'b1;
+        es_div_sor_valid <= 1'b1;
+        es_div_in_shkhd  <= 1'b1;
+    end
+    else if (es_div_in_shkhd & es_div_in_ready) begin  // ready & shkhd
+        es_div_end_valid <= 1'b0;
+        es_div_sor_valid <= 1'b0;
+    end
+    else if (es_div_in_shkhd & es_div_out_valid) begin // shkhd set to 1'b0
+        es_div_in_shkhd <= 1'b0;
+    end
+end
+/* div end */
+
+/* divu begin */
 wire [63:0] es_divu_dout;
 reg es_divu_end_valid; // valid & ready
 wire es_divu_end_ready;
 reg es_divu_sor_valid;
 wire es_divu_sor_ready;
-reg es_divu_out_valid;
-// shakehand
-reg es_div_in_shkhd;
-reg es_divu_in_shkhd;
-// div src op & values
-assign es_op_div  = es_alu_op[14];
-assign es_op_divu = es_alu_op[15];
-assign es_dividend = {32{es_op_div|es_op_divu}} & es_alu_src1;
-assign es_divisor  = {32{es_op_div|es_op_divu}} & es_alu_src2;
-// div src ready
-assign es_div_end_ready = es_op_div;
-assign es_div_sor_ready = es_op_div;
+wire es_divu_out_valid;
+reg es_divu_in_shkhd; // shakehand
 // divu src ready
 assign es_divu_end_ready = es_op_divu;
 assign es_divu_sor_ready = es_op_divu;
-
-// div input sending valid
-always @(posedge clk ) begin
-    if (reset) begin
-        es_div_end_valid <= 1'b0;
-        es_div_sor_valid <= 1'b0;
-        es_div_in_shkhd  <= 1'b0;
-    end
-    else if (~es_div_end_ready & ~es_div_in_shkhd) begin
-        es_div_end_valid <= es_op_div;
-        es_div_sor_valid <= es_op_div;
-        es_div_in_shkhd  <= 1'b1     ;
-    end
-    else if (es_div_end_ready) begin
-        es_div_end_valid <= 1'b0;
-        es_div_sor_valid <= 1'b0;
-    end
-end
 // divu input sending valid
+wire es_divu_in_ready;
+assign es_divu_in_ready = es_divu_end_ready & es_divu_sor_ready;
+
 always @(posedge clk ) begin
-    if (reset) begin
+    if (reset) begin                                     // reset
         es_divu_end_valid <= 1'b0;
         es_divu_sor_valid <= 1'b0;
         es_divu_in_shkhd  <= 1'b0;
     end
-    else if (~es_divu_end_ready & ~es_divu_in_shkhd) begin
-        es_divu_end_valid <= es_op_divu;
-        es_divu_sor_valid <= es_op_divu;
+    else if (~es_divu_in_shkhd & es_op_divu) begin       // valid: require ready
+        es_divu_end_valid <= 1'b1;
+        es_divu_sor_valid <= 1'b1;
         es_divu_in_shkhd  <= 1'b1;
     end
-    else if (es_divu_end_ready) begin
+    else if (es_divu_in_shkhd & es_divu_in_ready) begin  // ready & shkhd
         es_divu_end_valid <= 1'b0;
         es_divu_sor_valid <= 1'b0;
     end
+    else if (es_divu_in_shkhd & es_divu_out_valid) begin // shkhd set to 1'b0
+        es_divu_in_shkhd <= 1'b0;
+    end
 end
+/* divu end */
+
 /* lab6 32-bit dividers (my_div, my_divu): end */
 
 
@@ -205,12 +236,12 @@ assign es_hilo_we = es_op_mult
                   | es_op_multu
                   | es_op_div  & es_div_out_valid
                   | es_op_divu & es_divu_out_valid;
-assign es_alu_hi_res = {32{es_op_mult|es_op_multu}} & es_multer_result[63:32]
-                     | {32{es_op_div             }} & es_div_dout[63:32]
-                     | {32{es_op_divu            }} & es_divu_dout[63:32];
-assign es_alu_lo_res = {32{es_op_mult|es_op_multu}} & es_multer_result[31:0]
-                     | {32{es_op_div             }} & es_div_dout[31:0]
-                     | {32{es_op_divu            }} & es_divu_dout[31:0];
+assign es_hi_res = {32{es_op_mult|es_op_multu}} & es_mult_result[63:32]
+                 | {32{es_op_div             }} & es_div_dout[31:0]
+                 | {32{es_op_divu            }} & es_divu_dout[31:0];
+assign es_lo_res = {32{es_op_mult|es_op_multu}} & es_mult_result[31:0]
+                 | {32{es_op_div             }} & es_div_dout[63:32]
+                 | {32{es_op_divu            }} & es_divu_dout[63:32];
 
 always @(posedge clk) begin
     if (reset) begin
@@ -218,8 +249,8 @@ always @(posedge clk) begin
         lo <= 32'b0;
     end
     else if (es_hilo_we) begin // mult/div
-        hi <= es_alu_hi_res;
-        lo <= es_alu_lo_res;
+        hi <= es_hi_res;
+        lo <= es_lo_res;
     end
     else if (es_inst_mthi) begin // mthi
         hi <= es_rs_value;
@@ -235,7 +266,7 @@ end
 /* lab6 instantiated: begin */
 my_div inst_my_div(
     // clk
-    .clk                   (clk),             //in
+    .aclk                   (clk),             //in
     // dividend
     .s_axis_dividend_tdata (es_dividend),      //in
     .s_axis_dividend_tvalid(es_div_end_valid), //in
@@ -250,7 +281,7 @@ my_div inst_my_div(
 );
 my_divu inst_my_divu(
     // clk
-    .clk                   (clk),             //in
+    .aclk                   (clk),             //in
     // dividend
     .s_axis_dividend_tdata (es_dividend),      //in
     .s_axis_dividend_tvalid(es_divu_end_valid), //in
@@ -265,11 +296,12 @@ my_divu inst_my_divu(
 );
 /* lab6 instantiated: end */
 
+
 alu u_alu(
-    .alu_op     (es_alu_op[11:0]),
-    .alu_src1   (es_alu_src1    ),
-    .alu_src2   (es_alu_src2    ),
-    .alu_result (es_alu_result  )
+    .alu_op     (es_alu_op    ),
+    .alu_src1   (es_alu_src1  ),
+    .alu_src2   (es_alu_src2  ),
+    .alu_result (es_alu_result)
     );
 
 assign es_res_r = {32{  es_inst_mfhi}}  & hi
