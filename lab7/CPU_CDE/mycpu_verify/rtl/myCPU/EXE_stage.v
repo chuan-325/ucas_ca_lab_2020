@@ -30,7 +30,7 @@ reg [31:0] lo;
 
 reg  [`DS_TO_ES_BUS_WD -1:0] ds_to_es_bus_r;
 
-/* mult/div/MTMF ops begin */
+/* lab6 new ops begin */
 wire        es_inst_mtlo  ;
 wire        es_inst_mthi  ;
 wire        es_inst_mflo  ;
@@ -39,7 +39,7 @@ wire        es_op_divu    ;
 wire        es_op_div     ;
 wire        es_op_multu   ;
 wire        es_op_mult    ;
-/* mult/div/MTMF ops end */
+/* lab6 new ops end */
 wire [11:0] es_alu_op     ;
 wire        es_load_op    ;
 wire        es_src1_is_sa ;
@@ -98,7 +98,7 @@ assign es_to_ds_bus = {`ES_TO_DS_BUS_WD{ es_valid
                                                         es_dest,         //36:32 es_dest
                                                         es_res_r         //31: 0 es_res_r
                                                         };
-// es_ready_go change from 1'b1
+// lab6 es_ready_go change from 1'b1
 assign es_ready_go    = es_hilo_we | (~|{es_op_div,  // wait div to end
                                          es_op_divu
                                          });
@@ -136,7 +136,7 @@ assign es_alu_src2 = es_src2_is_imm ? es_alu_src2_imm       :
                                       es_rt_value           ;
 
 
-/* 33-bit multiplier: begin */
+/* lab6 33-bit multiplier: begin */
 wire [32:0] es_mult_a;
 wire [32:0] es_mult_b;
 wire [65:0] es_mult_result;
@@ -144,10 +144,10 @@ wire [65:0] es_mult_result;
 assign es_mult_a    = {es_op_mult & es_alu_src1[31], es_alu_src1};
 assign es_mult_b    = {es_op_mult & es_alu_src2[31], es_alu_src2};
 assign es_mult_result = $signed(es_mult_a) * $signed(es_mult_b);
-/* 33-bit multiplier: end */
+/* lab6 33-bit multiplier: end */
 
 
-/* 32-bit dividers (my_div, my_divu): begin */
+/* lab6 32-bit dividers (my_div, my_divu): begin */
 // Gerneral input
 wire [31:0] es_dividend;
 wire [31:0] es_divisor;
@@ -161,7 +161,7 @@ wire es_div_end_ready;
 reg es_div_sor_valid;
 wire es_div_sor_ready;
 wire es_div_out_valid;
-reg es_div_in_shkhd; // shakehand
+reg es_div_in_flag; // flag
 // div input sending valid
 wire es_div_in_ready;
 assign es_div_in_ready = es_div_end_ready & es_div_sor_ready;
@@ -170,19 +170,19 @@ always @(posedge clk ) begin
     if (reset) begin                                   // reset
         es_div_end_valid <= 1'b0;
         es_div_sor_valid <= 1'b0;
-        es_div_in_shkhd  <= 1'b0;
+        es_div_in_flag  <= 1'b0;
     end
-    else if (~es_div_in_shkhd & es_op_div) begin       // valid: require ready
+    else if (~es_div_in_flag & es_op_div) begin       // valid: require ready
         es_div_end_valid <= 1'b1;
         es_div_sor_valid <= 1'b1;
-        es_div_in_shkhd  <= 1'b1;
+        es_div_in_flag  <= 1'b1;
     end
-    else if (es_div_in_shkhd & es_div_in_ready) begin  // ready & shkhd
+    else if (es_div_in_flag & es_div_in_ready) begin  // ready & flag
         es_div_end_valid <= 1'b0;
         es_div_sor_valid <= 1'b0;
     end
-    else if (es_div_in_shkhd & es_div_out_valid) begin // shkhd set to 1'b0
-        es_div_in_shkhd <= 1'b0;
+    else if (es_div_in_flag & es_div_out_valid) begin // flag set to 1'b0
+        es_div_in_flag <= 1'b0;
     end
 end
 /* div end */
@@ -194,7 +194,7 @@ wire es_divu_end_ready;
 reg es_divu_sor_valid;
 wire es_divu_sor_ready;
 wire es_divu_out_valid;
-reg es_divu_in_shkhd; // shakehand
+reg es_divu_in_flag; // flag
 // divu input sending valid
 wire es_divu_in_ready;
 assign es_divu_in_ready = es_divu_end_ready & es_divu_sor_ready;
@@ -203,27 +203,27 @@ always @(posedge clk ) begin
     if (reset) begin                                     // reset
         es_divu_end_valid <= 1'b0;
         es_divu_sor_valid <= 1'b0;
-        es_divu_in_shkhd  <= 1'b0;
+        es_divu_in_flag  <= 1'b0;
     end
-    else if (~es_divu_in_shkhd & es_op_divu) begin       // valid: require ready
+    else if (~es_divu_in_flag & es_op_divu) begin       // valid: require ready
         es_divu_end_valid <= 1'b1;
         es_divu_sor_valid <= 1'b1;
-        es_divu_in_shkhd  <= 1'b1;
+        es_divu_in_flag  <= 1'b1;
     end
-    else if (es_divu_in_shkhd & es_divu_in_ready) begin  // ready & shkhd
+    else if (es_divu_in_flag & es_divu_in_ready) begin  // ready & flag
         es_divu_end_valid <= 1'b0;
         es_divu_sor_valid <= 1'b0;
     end
-    else if (es_divu_in_shkhd & es_divu_out_valid) begin // shkhd set to 1'b0
-        es_divu_in_shkhd <= 1'b0;
+    else if (es_divu_in_flag & es_divu_out_valid) begin // flag set to 1'b0
+        es_divu_in_flag <= 1'b0;
     end
 end
 /* divu end */
 
-/* 32-bit dividers (my_div, my_divu): end */
+/* lab6 32-bit dividers (my_div, my_divu): end */
 
 
-/* HI, LO R&W: begin */
+/* lab6 HI, LO R&W: begin */
 assign es_hilo_we = es_op_mult
                   | es_op_multu
                   | es_op_div  & es_div_out_valid
@@ -252,10 +252,10 @@ always @(posedge clk) begin
     end
 end
 
-/* HI, LO R&W: end */
+/* lab6 HI, LO R&W: end */
 
 
-/* instantiated: begin */
+/* lab6 instantiated: begin */
 my_div inst_my_div(
     // clk
     .aclk                   (clk),             //in
@@ -286,7 +286,7 @@ my_divu inst_my_divu(
     .m_axis_dout_tdata     (es_divu_dout),      //out
     .m_axis_dout_tvalid    (es_divu_out_valid)  //out
 );
-/* instantiated: end */
+/* lab6 instantiated: end */
 
 
 alu u_alu(

@@ -161,7 +161,7 @@ wire es_div_end_ready;
 reg es_div_sor_valid;
 wire es_div_sor_ready;
 wire es_div_out_valid;
-reg es_div_in_shkhd; // shakehand
+reg es_div_in_flag; // flag
 // div input sending valid
 wire es_div_in_ready;
 assign es_div_in_ready = es_div_end_ready & es_div_sor_ready;
@@ -170,19 +170,19 @@ always @(posedge clk ) begin
     if (reset) begin                                   // reset
         es_div_end_valid <= 1'b0;
         es_div_sor_valid <= 1'b0;
-        es_div_in_shkhd  <= 1'b0;
+        es_div_in_flag  <= 1'b0;
     end
-    else if (~es_div_in_shkhd & es_op_div) begin       // valid: require ready
+    else if (~es_div_in_flag & es_op_div) begin       // valid: require ready
         es_div_end_valid <= 1'b1;
         es_div_sor_valid <= 1'b1;
-        es_div_in_shkhd  <= 1'b1;
+        es_div_in_flag  <= 1'b1;
     end
-    else if (es_div_in_shkhd & es_div_in_ready) begin  // ready & shkhd
+    else if (es_div_in_flag & es_div_in_ready) begin  // ready & flag
         es_div_end_valid <= 1'b0;
         es_div_sor_valid <= 1'b0;
     end
-    else if (es_div_in_shkhd & es_div_out_valid) begin // shkhd set to 1'b0
-        es_div_in_shkhd <= 1'b0;
+    else if (es_div_in_flag & es_div_out_valid) begin // flag set to 1'b0
+        es_div_in_flag <= 1'b0;
     end
 end
 /* div end */
@@ -194,7 +194,7 @@ wire es_divu_end_ready;
 reg es_divu_sor_valid;
 wire es_divu_sor_ready;
 wire es_divu_out_valid;
-reg es_divu_in_shkhd; // shakehand
+reg es_divu_in_flag; // flag
 // divu input sending valid
 wire es_divu_in_ready;
 assign es_divu_in_ready = es_divu_end_ready & es_divu_sor_ready;
@@ -203,19 +203,19 @@ always @(posedge clk ) begin
     if (reset) begin                                     // reset
         es_divu_end_valid <= 1'b0;
         es_divu_sor_valid <= 1'b0;
-        es_divu_in_shkhd  <= 1'b0;
+        es_divu_in_flag  <= 1'b0;
     end
-    else if (~es_divu_in_shkhd & es_op_divu) begin       // valid: require ready
+    else if (~es_divu_in_flag & es_op_divu) begin       // valid: require ready
         es_divu_end_valid <= 1'b1;
         es_divu_sor_valid <= 1'b1;
-        es_divu_in_shkhd  <= 1'b1;
+        es_divu_in_flag  <= 1'b1;
     end
-    else if (es_divu_in_shkhd & es_divu_in_ready) begin  // ready & shkhd
+    else if (es_divu_in_flag & es_divu_in_ready) begin  // ready & flag
         es_divu_end_valid <= 1'b0;
         es_divu_sor_valid <= 1'b0;
     end
-    else if (es_divu_in_shkhd & es_divu_out_valid) begin // shkhd set to 1'b0
-        es_divu_in_shkhd <= 1'b0;
+    else if (es_divu_in_flag & es_divu_out_valid) begin // flag set to 1'b0
+        es_divu_in_flag <= 1'b0;
     end
 end
 /* divu end */
