@@ -100,9 +100,9 @@ assign es_to_ds_bus = {`ES_TO_DS_BUS_WD{ es_valid
                                                         };
 // lab6 es_ready_go change from 1'b1
 assign es_ready_go    = es_hilo_we | (~|{es_op_div,  // wait div to end
-                                         es_op_divu,
-                                         es_op_mult,
-                                         es_op_multu
+                                         es_op_divu//,
+                                         //es_op_mult,
+                                         //es_op_multu
                                          });
 assign es_allowin     = !es_valid || es_ready_go && ms_allowin;
 assign es_to_ms_valid =  es_valid && es_ready_go;
