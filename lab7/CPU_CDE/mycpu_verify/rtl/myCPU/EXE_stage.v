@@ -29,8 +29,13 @@ reg [31:0] hi;
 reg [31:0] lo;
 
 reg  [`DS_TO_ES_BUS_WD -1:0] ds_to_es_bus_r;
-
-/* lab6 new ops begin */
+//?wire inst_andi, inst_ori, inst_xori,
+// lab7 newly added:
+//!wire [ 2:0] es_load_type  ;
+//!wire [ 2:0] es_store_type ;
+wire [ 5:0] es_ls_type    ;
+wire [ 1:0] es_ls_laddr   ;
+wire [ 3:0] es_ls_laddr_d ;
 wire        es_inst_mtlo  ;
 wire        es_inst_mthi  ;
 wire        es_inst_mflo  ;
@@ -39,7 +44,6 @@ wire        es_op_divu    ;
 wire        es_op_div     ;
 wire        es_op_multu   ;
 wire        es_op_mult    ;
-/* lab6 new ops end */
 wire [11:0] es_alu_op     ;
 wire        es_load_op    ;
 wire        es_src1_is_sa ;
@@ -53,7 +57,10 @@ wire [15:0] es_imm        ;
 wire [31:0] es_rs_value   ;
 wire [31:0] es_rt_value   ;
 wire [31:0] es_pc         ;
-assign {es_inst_mtlo   ,  //143
+
+assign {es_ls_type     ,  //151:146 lab7 modified
+        es_ls_laddr    ,  //145:144
+        es_inst_mtlo   ,  //143
         es_inst_mthi   ,  //142
         es_inst_mflo   ,  //141
         es_inst_mfhi   ,  //140
@@ -76,6 +83,12 @@ assign {es_inst_mtlo   ,  //143
         es_pc             //31 :0
        } = ds_to_es_bus_r;
 
+// lab7 newly added: ls_laddr decoded one-hot
+assign es_ls_laddr_d[3] = (es_ls_laddr==2'b11);
+assign es_ls_laddr_d[2] = (es_ls_laddr==2'b10);
+assign es_ls_laddr_d[1] = (es_ls_laddr==2'b01);
+assign es_ls_laddr_d[0] = (es_ls_laddr==2'b00);
+
 wire [31:0] es_alu_src1  ;
 wire [31:0] es_alu_src2  ;
 wire [31:0] es_alu_result;
@@ -83,22 +96,25 @@ wire [31:0] es_res_r     ;
 wire [31:0] es_hi_res    ;
 wire [31:0] es_lo_res    ;
 
-wire es_hilo_we;
-wire es_res_from_mem;
+wire es_hilo_we          ;
+wire es_mem_re     ;
 
-assign es_res_from_mem = es_load_op;
-assign es_to_ms_bus = {es_res_from_mem,  //70:70
-                       es_gr_we       ,  //69:69
-                       es_dest        ,  //68:64
-                       es_res_r       ,  //63:32 originally es_alu_result
-                       es_pc             //31:0
+assign es_mem_re = es_load_op;
+assign es_to_ms_bus = {es_rt_value , //110:79 lab7 modified
+                       es_ls_laddr , //78:77
+                       es_ls_type  , //76:71
+                       es_mem_re   , //70:70
+                       es_gr_we    , //69:69
+                       es_dest     , //68:64
+                       es_res_r    , //63:32 originally es_alu_result
+                       es_pc         //31:0
                       };
 assign es_to_ds_bus = {`ES_TO_DS_BUS_WD{ es_valid
-                                       & es_gr_we}} & {~es_res_from_mem, //37    es_res_valid
+                                       & es_gr_we}} & {~es_mem_re, //37    es_res_valid
                                                         es_dest,         //36:32 es_dest
                                                         es_res_r         //31: 0 es_res_r
                                                         };
-// lab6 es_ready_go change from 1'b1
+// es_ready_go change from 1'b1
 assign es_ready_go    = es_hilo_we | (~|{es_op_div,  // wait div to end
                                          es_op_divu
                                          });
@@ -136,7 +152,7 @@ assign es_alu_src2 = es_src2_is_imm ? es_alu_src2_imm       :
                                       es_rt_value           ;
 
 
-/* lab6 33-bit multiplier: begin */
+/* 33-bit multiplier: begin */
 wire [32:0] es_mult_a;
 wire [32:0] es_mult_b;
 wire [65:0] es_mult_result;
@@ -144,10 +160,10 @@ wire [65:0] es_mult_result;
 assign es_mult_a    = {es_op_mult & es_alu_src1[31], es_alu_src1};
 assign es_mult_b    = {es_op_mult & es_alu_src2[31], es_alu_src2};
 assign es_mult_result = $signed(es_mult_a) * $signed(es_mult_b);
-/* lab6 33-bit multiplier: end */
+/* 33-bit multiplier: end */
 
 
-/* lab6 32-bit dividers (my_div, my_divu): begin */
+/* 32-bit dividers (my_div, my_divu): begin */
 // Gerneral input
 wire [31:0] es_dividend;
 wire [31:0] es_divisor;
@@ -220,10 +236,10 @@ always @(posedge clk ) begin
 end
 /* divu end */
 
-/* lab6 32-bit dividers (my_div, my_divu): end */
+/* 32-bit dividers (my_div, my_divu): end */
 
 
-/* lab6 HI, LO R&W: begin */
+/* HI, LO R&W: begin */
 assign es_hilo_we = es_op_mult
                   | es_op_multu
                   | es_op_div  & es_div_out_valid
@@ -252,10 +268,10 @@ always @(posedge clk) begin
     end
 end
 
-/* lab6 HI, LO R&W: end */
+/* HI, LO R&W: end */
 
 
-/* lab6 instantiated: begin */
+/* instantiated: begin */
 my_div inst_my_div(
     // clk
     .aclk                   (clk),             //in
@@ -286,7 +302,7 @@ my_divu inst_my_divu(
     .m_axis_dout_tdata     (es_divu_dout),      //out
     .m_axis_dout_tvalid    (es_divu_out_valid)  //out
 );
-/* lab6 instantiated: end */
+/* instantiated: end */
 
 
 alu u_alu(
@@ -301,9 +317,41 @@ assign es_res_r = {32{  es_inst_mfhi}}  & hi
                 | {32{~(es_inst_mfhi
                        |es_inst_mflo)}} & es_alu_result ;
 
+//lab7 newly added: write_strb
+wire [ 3:0] write_strb;
+wire [31:0] write_data;
+
+assign write_strb = {4{es_ls_type[4] &  es_ls_laddr_d[0]}} & 4'b1111 // SWR
+                  | {4{es_ls_type[4] &  es_ls_laddr_d[1]}} & 4'b1110
+                  | {4{es_ls_type[4] &  es_ls_laddr_d[2]}} & 4'b1100
+                  | {4{es_ls_type[4] &  es_ls_laddr_d[3]}} & 4'b1000
+                  | {4{es_ls_type[3] &  es_ls_laddr_d[0]}} & 4'b0001 // SWL
+                  | {4{es_ls_type[3] &  es_ls_laddr_d[1]}} & 4'b0011
+                  | {4{es_ls_type[3] &  es_ls_laddr_d[2]}} & 4'b0111
+                  | {4{es_ls_type[3] &  es_ls_laddr_d[3]}} & 4'b1111
+                  | {4{es_ls_type[2] & ~es_ls_laddr[1]  }} & 4'b0011 // SH
+                  | {4{es_ls_type[2] &  es_ls_laddr[1]  }} & 4'b1100
+                  | {4{es_ls_type[1] &  es_ls_laddr_d[0]}} & 4'b0001 // SB
+                  | {4{es_ls_type[1] &  es_ls_laddr_d[1]}} & 4'b0010
+                  | {4{es_ls_type[1] &  es_ls_laddr_d[2]}} & 4'b0100
+                  | {4{es_ls_type[1] &  es_ls_laddr_d[3]}} & 4'b1000
+                  | {4{es_ls_type[0] }}                    & 4'b1111;// SW
+
+assign write_data = {32{es_ls_type[4] &  es_ls_laddr_d[0]}} &  es_rt_value                // SWR
+                  | {32{es_ls_type[4] &  es_ls_laddr_d[1]}} & {es_rt_value[23:0],  8'b0}
+                  | {32{es_ls_type[4] &  es_ls_laddr_d[2]}} & {es_rt_value[15:0], 16'b0}
+                  | {32{es_ls_type[4] &  es_ls_laddr_d[3]}} & {es_rt_value[ 7:0], 24'b0}
+                  | {32{es_ls_type[3] &  es_ls_laddr_d[0]}} & {24'b0, es_rt_value[31:24]} // SWL
+                  | {32{es_ls_type[3] &  es_ls_laddr_d[1]}} & {16'b0, es_rt_value[31:16]}
+                  | {32{es_ls_type[3] &  es_ls_laddr_d[2]}} & { 8'b0, es_rt_value[31: 8]}
+                  | {32{es_ls_type[3] &  es_ls_laddr_d[3]}} &  es_rt_value
+                  | {32{es_ls_type[2]}}                     & {2{es_rt_value[15:0]}}       // SH
+                  | {32{es_ls_type[1]}}                     & {4{es_rt_value[ 7:0]}}       // SB
+                  | {32{es_ls_type[0]}}                     &  es_rt_value;                // SW
+
 assign data_sram_en    = 1'b1;
-assign data_sram_wen   = es_mem_we && es_valid ? 4'hf : 4'h0;
+assign data_sram_wen   = es_mem_we & es_valid ? write_strb : 4'h0; // lab7 modified
 assign data_sram_addr  = es_alu_result; // note: do not change because addr can only be an alu_result
-assign data_sram_wdata = es_rt_value;
+assign data_sram_wdata = write_data; // lab7 modified
 
 endmodule
