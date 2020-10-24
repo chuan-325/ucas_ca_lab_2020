@@ -10,20 +10,4 @@
     `define ES_TO_DS_BUS_WD 38
     `define MS_TO_DS_BUS_WD 37
 
-    //lab7 newly added
-    /*
-    `define LW_TYPE 3'b000
-    `define LB_TYPE 3'b001
-    `define LBU_TYPE 3'b010
-    `define LH_TYPE 3'b011
-    `define LHU_TYPE 3'b100
-    `define LWL_TYPE 3'b101
-    `define LWR_TYPE 3'b110
-
-    `define SW_TYPE 3'b000
-    `define SB_TYPE 3'b001
-    `define SH_TYPE 3'b011
-    `define SWL_TYPE 3'b101
-    `define SWR_TYPE 3'b110
-    */
 `endif
