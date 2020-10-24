@@ -179,29 +179,29 @@ wire [ 5:0] ls_type;
 wire [ 1:0] ls_laddr; // lowest 2 bits in address
 
 assign br_bus       = {br_stall, br_taken, br_target};
-assign ds_to_es_bus = {ls_type     ,  //151:146  lab7 modified
-                       ls_laddr    ,  //145:144
-                       inst_mtlo   ,  //143     | op
-                       inst_mthi   ,  //142
-                       inst_mflo   ,  //141
-                       inst_mfhi   ,  //140
-                       inst_divu   ,  //139
-                       inst_div    ,  //138
-                       inst_multu  ,  //137
-                       inst_mult   ,  //136
-                       alu_op      ,  //135:124
-                       mem_re      ,  //123:123
-                       src1_is_sa  ,  //122:122  | src
-                       src1_is_pc  ,  //121:121
-                       src2_is_imm ,  //120:120
-                       src2_is_8   ,  //119:119
-                       gr_we       ,  //118:118  | we
-                       mem_we      ,  //117:117
-                       dest        ,  //116:112  | val
-                       imm         ,  //111:96
-                       rs_value    ,  //95 :64
-                       rt_value    ,  //63 :32
-                       ds_pc          //31 :0
+assign ds_to_es_bus = {ls_type    ,  //151:146  lab7 modified
+                       ls_laddr   ,  //145:144
+                       inst_mtlo  ,  //143     | op
+                       inst_mthi  ,  //142
+                       inst_mflo  ,  //141
+                       inst_mfhi  ,  //140
+                       inst_divu  ,  //139
+                       inst_div   ,  //138
+                       inst_multu ,  //137
+                       inst_mult  ,  //136
+                       alu_op     ,  //135:124
+                       mem_re     ,  //123:123
+                       src1_is_sa ,  //122:122  | src
+                       src1_is_pc ,  //121:121
+                       src2_is_imm,  //120:120
+                       src2_is_8  ,  //119:119
+                       gr_we      ,  //118:118  | we
+                       mem_we     ,  //117:117
+                       dest       ,  //116:112  | val
+                       imm        ,  //111:96
+                       rs_value   ,  //95 :64
+                       rt_value   ,  //63 :32
+                       ds_pc         //31 :0
                       };
 
 // lab7 newly added: load/store type
@@ -212,22 +212,7 @@ assign ls_type = {inst_lhu | inst_lbu ,          // [5] unsigned extension
                   inst_lb  | inst_lbu | inst_sb, // [1] l/s byte
                   inst_lw  | inst_sw             // [0] l/s word
                   };
-/*
-assign load_type = inst_lw  ? `LW_TYPE:
-                   inst_lb  ? `LB_TYPE:
-                   inst_lbu ? `LBU_TYPE:
-                   inst_lh  ? `LH_TYPE:
-                   inst_lhu ? `LHU_TYPE:
-                   inst_lwl ? `LWL_TYPE:
-                   inst_lwr ? `LWR_TYPE:
-                              3'b000;
-assign store_type = inst_sw  ? `SW_TYPE:
-                    inst_sb  ? `SB_TYPE:
-                    inst_sh  ? `SH_TYPE:
-                    inst_swl ? `SWL_TYPE:
-                    inst_swr ? `SWR_TYPE:
-                               3'b000;
-*/
+
 /*---Need block? begin---*/
 // if reg/dest == 0 ?
 wire rs_neq_0;
@@ -440,43 +425,42 @@ assign alu_op[10] = inst_sra  | inst_srav ;
 assign alu_op[11] = inst_lui  ;
 
 assign ls_laddr = {2{mem_re | mem_we}} & func[1:0];
-//!(mem_re | mem_we) ? func[1:0]:2'b0;
 
-assign src1_is_sa   = inst_sll
-                    | inst_srl
-                    | inst_sra;
-assign src1_is_pc   = inst_jal
-                    | inst_bltzal
-                    | inst_bgezal
-                    | inst_jalr;
-assign src2_is_imm  = |{inst_addiu, inst_lui, inst_lw, inst_sw,
-                        inst_addi, inst_slti, inst_sltiu,
-                        inst_andi, inst_xori, inst_ori,  // note: uimm as imm
-                        inst_lb  , inst_lbu , inst_lh , inst_lhu,
-                        inst_sb  , inst_sh  ,
-                        inst_swl , inst_swr , inst_lwl, inst_lwr// lab7 newly added
-                        };
-assign src2_is_8    = inst_jal
-                    | inst_bltzal // lab7 newly added
-                    | inst_bgezal
-                    | inst_jalr;
-assign dst_is_r31   = inst_jal    // lab7 newly added
-                    | inst_bltzal
-                    | inst_bgezal ;
-assign dst_is_rt    = |{inst_addiu, inst_addi, inst_slti, inst_sltiu,
-                        inst_andi, inst_ori, inst_xori,
-                        inst_lui,
-                        inst_lw,
-                        inst_lb, inst_lbu, inst_lh, inst_lhu,// lab7 newly added
-                        inst_lwl, inst_lwr // lab7 newly added
-                        };
-assign gr_we        = ~|{inst_sw, inst_sb, inst_sh, inst_swl, inst_swr,
-                         inst_beq, inst_bne, inst_bgez, inst_bgtz, inst_blez, inst_bltz,
-                         inst_jr, inst_j,// newly added
-                         inst_mult, inst_multu,
-                         inst_div, inst_divu,
-                         inst_mthi, inst_mtlo
-                        };
+assign src1_is_sa  = inst_sll
+                   | inst_srl
+                   | inst_sra;
+assign src1_is_pc  = inst_jal
+                   | inst_bltzal
+                   | inst_bgezal
+                   | inst_jalr;
+assign src2_is_imm = |{inst_addiu, inst_lui, inst_lw, inst_sw,
+                       inst_addi, inst_slti, inst_sltiu,
+                       inst_andi, inst_xori, inst_ori,  // note: uimm as imm
+                       inst_lb  , inst_lbu , inst_lh , inst_lhu,
+                       inst_sb  , inst_sh  ,
+                       inst_swl , inst_swr , inst_lwl, inst_lwr// lab7 newly added
+                      };
+assign src2_is_8   = inst_jal
+                   | inst_bltzal // lab7 newly added
+                   | inst_bgezal
+                   | inst_jalr;
+assign dst_is_r31  = inst_jal    // lab7 newly added
+                   | inst_bltzal
+                   | inst_bgezal ;
+assign dst_is_rt   = |{inst_addiu, inst_addi, inst_slti, inst_sltiu,
+                       inst_andi, inst_ori, inst_xori,
+                       inst_lui,
+                       inst_lw,
+                       inst_lb, inst_lbu, inst_lh, inst_lhu,// lab7 newly added
+                       inst_lwl, inst_lwr // lab7 newly added
+                      };
+assign gr_we       = ~|{inst_sw, inst_sb, inst_sh, inst_swl, inst_swr,
+                        inst_beq, inst_bne, inst_bgez, inst_bgtz, inst_blez, inst_bltz,
+                        inst_jr, inst_j,// newly added
+                        inst_mult, inst_multu,
+                        inst_div, inst_divu,
+                        inst_mthi, inst_mtlo
+                       };
 
 assign mem_re = inst_lw
               | inst_lb     // lab7 newly added
@@ -518,11 +502,11 @@ assign rt_value = rt_eq_es_dest ? es_res   :
                                   rf_rdata2;
 
 assign rs_eq_rt = (rs_value == rt_value);
-//! lab7 newly added: >=0, >0, <=0, <0
-assign rs_be_0 = ~rs_value[31] ;               // ($signed(rs_value) >= 0);
-assign rs_bt_0 = ~rs_value[31] & ( |rs_value); // ($signed(rs_value) >  0);
-assign rs_se_0 =  rs_value[31] | (~|rs_value); // ($signed(rs_value) <= 0);
-assign rs_st_0 =  rs_value[31] ;               // ($signed(rs_value) <  0);
+// lab7 newly added: >=0, >0, <=0, <0
+assign rs_be_0 = ~rs_value[31] ;
+assign rs_bt_0 = ~rs_value[31] & ( |rs_value);
+assign rs_se_0 =  rs_value[31] | (~|rs_value);
+assign rs_st_0 =  rs_value[31] ;
 
 // br info
 assign br_stall = 1'b0; //(inst_beq || inst_bne ) & st_eq_dests;
