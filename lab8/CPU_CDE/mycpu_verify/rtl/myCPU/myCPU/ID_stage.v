@@ -136,7 +136,6 @@ wire        inst_bne;
 wire        inst_jal;
 wire        inst_jr;
 
-// lab7 newly added:
 wire        inst_bgez;
 wire        inst_bgtz;
 wire        inst_blez;
@@ -165,18 +164,15 @@ wire [ 4:0] rf_raddr2;
 wire [31:0] rf_rdata2;
 
 wire        rs_eq_rt;
-// lab7 newly added:
 wire        rs_be_0;
 wire        rs_bt_0;
 wire        rs_se_0;
 wire        rs_st_0;
 
-// lab7 newly added:
 wire [ 5:0] ls_type;
-//wire [ 1:0] ls_laddr;
 
 assign br_bus       = {br_stall, br_taken, br_target};
-assign ds_to_es_bus = {ls_type    ,  //149:144  lab7 modified
+assign ds_to_es_bus = {ls_type    ,  //149:144
                        inst_mtlo  ,  //143     | op
                        inst_mthi  ,  //142
                        inst_mflo  ,  //141
@@ -200,7 +196,7 @@ assign ds_to_es_bus = {ls_type    ,  //149:144  lab7 modified
                        ds_pc         //31 :0
                       };
 
-// lab7 newly added: load/store type
+// load/store type
 assign ls_type = {inst_lhu | inst_lbu ,          // [5] unsigned extension
                   inst_lwr | inst_swr ,          // [4] l/s word right
                   inst_lwl | inst_swl ,          // [3] l/s word left
@@ -382,7 +378,6 @@ assign inst_mfhi   = op_d[6'h00] & func_d[6'h10] & sa_d[5'h00];
 assign inst_mflo   = op_d[6'h00] & func_d[6'h12] & sa_d[5'h00];
 assign inst_mthi   = op_d[6'h00] & func_d[6'h11] & sa_d[5'h00];
 assign inst_mtlo   = op_d[6'h00] & func_d[6'h13] & sa_d[5'h00];
-// lab7 newly added:
 assign inst_bgez   = op_d[6'h01] & rt_d[5'h01];
 assign inst_bgtz   = op_d[6'h07] & rt_d[5'h00];
 assign inst_blez   = op_d[6'h06] & rt_d[5'h00];
@@ -403,7 +398,7 @@ assign inst_swl    = op_d[6'h2a];
 assign inst_swr    = op_d[6'h2e];
 
 assign alu_op[ 0] = |{inst_addu, inst_addiu, inst_add, inst_addi,
-                      inst_lw, inst_lwl, inst_lwr,                // lab7 newly added:
+                      inst_lw, inst_lwl, inst_lwr,
                       inst_lb, inst_lbu, inst_lh, inst_lhu,
                       inst_sw, inst_sb, inst_sh, inst_swl, inst_swr,
                       inst_bgezal, inst_bltzal,
@@ -432,21 +427,21 @@ assign src2_is_imm = |{inst_addiu, inst_lui, inst_lw, inst_sw,
                        inst_andi, inst_xori, inst_ori,  // note: uimm as imm
                        inst_lb  , inst_lbu , inst_lh , inst_lhu,
                        inst_sb  , inst_sh  ,
-                       inst_swl , inst_swr , inst_lwl, inst_lwr// lab7 newly added
+                       inst_swl , inst_swr , inst_lwl, inst_lwr
                       };
 assign src2_is_8   = inst_jal
-                   | inst_bltzal // lab7 newly added
+                   | inst_bltzal
                    | inst_bgezal
                    | inst_jalr;
-assign dst_is_r31  = inst_jal    // lab7 newly added
+assign dst_is_r31  = inst_jal
                    | inst_bltzal
                    | inst_bgezal ;
 assign dst_is_rt   = |{inst_addiu, inst_addi, inst_slti, inst_sltiu,
                        inst_andi, inst_ori, inst_xori,
                        inst_lui,
                        inst_lw,
-                       inst_lb, inst_lbu, inst_lh, inst_lhu,// lab7 newly added
-                       inst_lwl, inst_lwr // lab7 newly added
+                       inst_lb, inst_lbu, inst_lh, inst_lhu,
+                       inst_lwl, inst_lwr
                       };
 assign gr_we       = ~|{inst_sw, inst_sb, inst_sh, inst_swl, inst_swr,
                         inst_beq, inst_bne, inst_bgez, inst_bgtz, inst_blez, inst_bltz,
@@ -457,14 +452,14 @@ assign gr_we       = ~|{inst_sw, inst_sb, inst_sh, inst_swl, inst_swr,
                        };
 
 assign mem_re = inst_lw
-              | inst_lb     // lab7 newly added
+              | inst_lb
               | inst_lbu
               | inst_lh
               | inst_lhu
               | inst_lwl
               | inst_lwr;
 assign mem_we = inst_sw
-              | inst_sb     // lab7 newly added
+              | inst_sb
               | inst_sh
               | inst_swl
               | inst_swr;
@@ -496,7 +491,6 @@ assign rt_value = rt_eq_es_dest ? es_res   :
                                   rf_rdata2;
 
 assign rs_eq_rt = (rs_value == rt_value);
-// lab7 newly added: >=0, >0, <=0, <0
 assign rs_be_0 = ~rs_value[31] ;
 assign rs_bt_0 = ~rs_value[31] & ( |rs_value);
 assign rs_se_0 =  rs_value[31] | (~|rs_value);
@@ -504,8 +498,7 @@ assign rs_st_0 =  rs_value[31] ;
 
 // br info
 assign br_stall = 1'b0; //(inst_beq || inst_bne ) & st_eq_dests;
-// lab7 modified
-assign br_taken = ( inst_beq    &  rs_eq_rt  // lab7 modified
+assign br_taken = ( inst_beq    &  rs_eq_rt
                   | inst_bne    & ~rs_eq_rt
                   | inst_bgez   &  rs_be_0
                   | inst_bgtz   &  rs_bt_0

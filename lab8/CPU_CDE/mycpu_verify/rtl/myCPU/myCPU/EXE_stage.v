@@ -29,7 +29,6 @@ reg [31:0] hi;
 reg [31:0] lo;
 
 reg  [`DS_TO_ES_BUS_WD -1:0] ds_to_es_bus_r;
-// lab7 newly added:
 wire [ 5:0] es_ls_type    ;
 wire [ 1:0] es_ls_laddr   ;
 wire [ 3:0] es_ls_laddr_d ;
@@ -55,7 +54,7 @@ wire [31:0] es_rs_value   ;
 wire [31:0] es_rt_value   ;
 wire [31:0] es_pc         ;
 
-assign {es_ls_type     ,  //149:144 lab7 modified
+assign {es_ls_type     ,  //149:144
         es_inst_mtlo   ,  //143
         es_inst_mthi   ,  //142
         es_inst_mflo   ,  //141
@@ -86,7 +85,7 @@ wire [31:0] es_res_r     ;
 wire [31:0] es_hi_res    ;
 wire [31:0] es_lo_res    ;
 
-// lab7 newly added: ls_laddr decoded one-hot
+// ls_laddr decoded one-hot
 assign es_ls_laddr_d[3] = (es_ls_laddr==2'b11);
 assign es_ls_laddr_d[2] = (es_ls_laddr==2'b10);
 assign es_ls_laddr_d[1] = (es_ls_laddr==2'b01);
@@ -97,7 +96,7 @@ wire es_hilo_we          ;
 wire es_mem_re     ;
 
 assign es_mem_re = es_load_op;
-assign es_to_ms_bus = {es_rt_value, //110:79 lab7 modified
+assign es_to_ms_bus = {es_rt_value, //110:79
                        es_ls_laddr, //78:77
                        es_ls_type , //76:71
                        es_mem_re  , //70:70
@@ -313,7 +312,7 @@ assign es_res_r = {32{  es_inst_mfhi}}  & hi
                 | {32{~(es_inst_mfhi
                        |es_inst_mflo)}} & es_alu_result ;
 
-/*lab7 newly added: Generate write_strb & write data: begin */
+/* Generate write_strb & write data: begin */
 
 // prepare write_strb selection
 wire [3:0] write_strb_swr;
@@ -365,12 +364,12 @@ assign write_data = {32{es_ls_type[4]}} & write_data_swr // SWR
                   | {32{es_ls_type[1]}} & write_data_sb  // SB
                   | {32{es_ls_type[0]}} & es_rt_value;   // SW
 
-/*lab7 newly added: Generate write_strb & write data: end */
+/* Generate write_strb & write data: end */
 
 
 assign data_sram_en    = 1'b1;
-assign data_sram_wen   = es_mem_we & es_valid ? write_strb : 4'h0; // lab7 modified
+assign data_sram_wen   = es_mem_we & es_valid ? write_strb : 4'h0;
 assign data_sram_addr  = es_alu_result; // note: do not change because addr can only be an alu_result
-assign data_sram_wdata = write_data; // lab7 modified
+assign data_sram_wdata = write_data;
 
 endmodule
