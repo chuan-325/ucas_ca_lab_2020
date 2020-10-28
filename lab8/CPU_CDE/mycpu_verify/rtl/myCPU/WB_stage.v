@@ -17,6 +17,8 @@ module wb_stage(
     output [31:0] debug_wb_rf_wdata
 );
 
+/* ------------------------------ DECLARATION ------------------------------ */
+
 reg         ws_valid;
 wire        ws_ready_go;
 
@@ -25,15 +27,19 @@ wire        ws_gr_we;
 wire [ 4:0] ws_dest;
 wire [31:0] ws_final_result;
 wire [31:0] ws_pc;
+
+wire        rf_we;
+wire [4 :0] rf_waddr;
+wire [31:0] rf_wdata;
+
+/* ------------------------------ LOGIC ------------------------------ */
+
 assign {ws_gr_we       ,  //69:69
         ws_dest        ,  //68:64
         ws_final_result,  //63:32
         ws_pc             //31:0
        } = ms_to_ws_bus_r;
 
-wire        rf_we;
-wire [4 :0] rf_waddr;
-wire [31:0] rf_wdata;
 assign ws_to_rf_bus = {rf_we   ,  //37:37
                        rf_waddr,  //36:32 dest
                        rf_wdata   //31:0  wdata

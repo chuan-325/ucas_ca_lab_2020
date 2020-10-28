@@ -18,6 +18,8 @@ module if_stage(
     input  [31:0] inst_sram_rdata
 );
 
+/* ------------------------------ DECLARATION ------------------------------ */
+
 reg         fs_valid;
 wire        fs_ready_go;
 wire        fs_allowin;
@@ -30,10 +32,14 @@ wire [31:0] nextpc;
 wire         br_stall;
 wire         br_taken;
 wire [ 31:0] br_target;
-assign {br_stall, br_taken, br_target} = br_bus;
 
 wire [31:0] fs_inst;
 reg  [31:0] fs_pc;
+
+/* ------------------------------ LOGIC ------------------------------ */
+
+assign {br_stall, br_taken, br_target} = br_bus;
+
 assign fs_to_ds_bus = {fs_inst ,
                        fs_pc   };
 

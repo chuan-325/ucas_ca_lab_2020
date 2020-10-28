@@ -22,39 +22,28 @@ module id_stage(
     input  [`WS_TO_RF_BUS_WD -1:0] ws_to_rf_bus
 );
 
+/* ------------------------------ DECLARATION ------------------------------ */
+
 reg         ds_valid   ;
 wire        ds_ready_go;
 
 wire [31                 :0] fs_pc;
 reg  [`FS_TO_DS_BUS_WD -1:0] fs_to_ds_bus_r;
-assign fs_pc = fs_to_ds_bus[31:0];
 
 wire [31:0] ds_inst;
 wire [31:0] ds_pc  ;
-assign {ds_inst,
-        ds_pc  } = fs_to_ds_bus_r;
 
 wire        rf_we   ;
 wire [ 4:0] rf_waddr;
 wire [31:0] rf_wdata;
-assign {rf_we   ,  //37:37
-        rf_waddr,  //36:32
-        rf_wdata   //31:0
-       } = ws_to_rf_bus;
 
 wire es_res_valid;
-assign es_res_valid = es_to_ds_bus[37];
 
 wire [ 4:0] es_dest;
 wire [ 4:0] ms_dest;
 wire [ 4:0] ws_dest;
 wire [31:0] es_res;
 wire [31:0] ms_res;
-assign es_dest = es_to_ds_bus[36:32]  ;
-assign ms_dest = ms_to_ds_bus[36:32]  ;
-assign ws_dest = rf_waddr & {5{rf_we}};
-assign es_res  = es_to_ds_bus[31:0];
-assign ms_res  = ms_to_ds_bus[31:0];
 
 wire        br_stall;
 wire        br_taken;
@@ -173,7 +162,53 @@ wire        rs_st_0;
 
 // lab7 newly added:
 wire [ 5:0] ls_type;
-//wire [ 1:0] ls_laddr;
+
+// if reg/dest == 0 ?
+wire rs_neq_0;
+wire rt_neq_0;
+wire es_dest_neq_0;
+wire ms_dest_neq_0;
+wire ws_dest_neq_0;
+
+// if a_rx == b_dest ?
+wire rs_eq_es_dest;
+wire rt_eq_es_dest;
+wire rs_eq_ms_dest;
+wire rt_eq_ms_dest;
+wire rs_eq_ws_dest;
+wire rt_eq_ws_dest;
+wire st_eq_es_dest; //st(@es)
+
+// if current type (i.e. at decode stage) has any src from reg
+wire type_st;
+wire type_rs;
+wire type_rt;
+wire type_nr;
+
+// if rx == dests?
+wire rs_eq_dests;
+wire rt_eq_dests;
+wire st_eq_dests;
+
+/* ------------------------------ LOGIC ------------------------------ */
+
+assign fs_pc = fs_to_ds_bus[31:0];
+
+assign {ds_inst,
+        ds_pc  } = fs_to_ds_bus_r;
+
+assign {rf_we   ,  //37:37
+        rf_waddr,  //36:32
+        rf_wdata   //31:0
+       } = ws_to_rf_bus;
+
+assign es_res_valid = es_to_ds_bus[37];
+
+assign es_dest = es_to_ds_bus[36:32]  ;
+assign ms_dest = ms_to_ds_bus[36:32]  ;
+assign ws_dest = rf_waddr & {5{rf_we}};
+assign es_res  = es_to_ds_bus[31:0];
+assign ms_res  = ms_to_ds_bus[31:0];
 
 assign br_bus       = {br_stall, br_taken, br_target};
 assign ds_to_es_bus = {ls_type    ,  //149:144  lab7 modified
@@ -210,12 +245,6 @@ assign ls_type = {inst_lhu | inst_lbu ,          // [5] unsigned extension
                   };
 
 /*---Need block? begin---*/
-// if reg/dest == 0 ?
-wire rs_neq_0;
-wire rt_neq_0;
-wire es_dest_neq_0;
-wire ms_dest_neq_0;
-wire ws_dest_neq_0;
 // if(|a=0) neq=0
 assign rs_neq_0 = |rs;
 assign rt_neq_0 = |rt;
@@ -223,14 +252,6 @@ assign es_dest_neq_0 = |es_dest;
 assign ms_dest_neq_0 = |ms_dest;
 assign ws_dest_neq_0 = |ws_dest;
 
-// if a_rx == b_dest ?
-wire rs_eq_es_dest;
-wire rt_eq_es_dest;
-wire rs_eq_ms_dest;
-wire rt_eq_ms_dest;
-wire rs_eq_ws_dest;
-wire rt_eq_ws_dest;
-wire st_eq_es_dest; //st(@es)
 // if(ab!=0 && a==b) eq=1
 assign rs_eq_es_dest = (rs_neq_0 & es_dest_neq_0) && (rs == es_dest); // rs
 assign rs_eq_ms_dest = (rs_neq_0 & ms_dest_neq_0) && (rs == ms_dest);
@@ -241,11 +262,6 @@ assign rt_eq_ws_dest = (rt_neq_0 & ws_dest_neq_0) && (rt == ws_dest);
 assign st_eq_es_dest = rs_eq_es_dest | rt_eq_es_dest;                 // st(@es)
 
 // Type define for block situation
-// if current type (i.e. at decode stage) has any src from reg
-wire type_st;
-wire type_rs;
-wire type_rt;
-wire type_nr;
                             // src from rs & rt
 assign type_st = inst_addu  // (op)[rs, rt] -> rd
                | inst_add   // ...
@@ -289,10 +305,6 @@ assign type_nr = inst_lui   // (op)imm -> rt
                | inst_mfhi  // (op)()->rd
                | inst_mflo; // (op)()->rd
 
-// if rx == dests?
-wire rs_eq_dests;
-wire rt_eq_dests;
-wire st_eq_dests;
 // rs+rt=st
 assign rs_eq_dests = rs_eq_es_dest | rs_eq_ms_dest | rs_eq_ws_dest;
 assign rt_eq_dests = rt_eq_es_dest | rt_eq_ms_dest | rt_eq_ws_dest;
