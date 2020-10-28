@@ -466,7 +466,7 @@ assign dst_is_rt   = |{inst_addiu, inst_addi, inst_slti, inst_sltiu,
                       };
 assign gr_we       = ~|{inst_sw, inst_sb, inst_sh, inst_swl, inst_swr,
                         inst_beq, inst_bne, inst_bgez, inst_bgtz, inst_blez, inst_bltz,
-                        inst_jr, inst_j,// newly added
+                        inst_jr, inst_j,
                         inst_mult, inst_multu,
                         inst_div, inst_divu,
                         inst_mthi, inst_mtlo
