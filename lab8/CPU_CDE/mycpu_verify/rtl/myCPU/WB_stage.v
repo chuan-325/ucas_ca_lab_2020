@@ -10,6 +10,9 @@ module wb_stage(
     input  [`MS_TO_WS_BUS_WD -1:0]  ms_to_ws_bus  ,
     //to rf: for write back
     output [`WS_TO_RF_BUS_WD -1:0]  ws_to_rf_bus  ,
+    // lab8: flush
+    output [31:0] pc_fr_epc,
+    input         eret_flush,
     //trace debug interface
     output [31:0] debug_wb_pc     ,
     output [ 3:0] debug_wb_rf_wen ,
@@ -32,9 +35,38 @@ wire        rf_we;
 wire [4 :0] rf_waddr;
 wire [31:0] rf_wdata;
 
+// lab8
+wire ws_inst_mtc0;
+wire ws_inst_mfc0;
+wire ws_inst_sysc;
+wire ws_inst_eret;
+wire [2:0] ws_sel;
+wire [4:0] ws_rd;
+
+wire [31:0] ws_c0_wdata;
+wire [31:0] ws_c0_rdata;
+
+wire ws_if_privil;
+wire [31:0] ws_privil_res;
+
+wire ws_ex; // report exception
+
+wire ws_bd; // if inst is in branch-delay-slot
+
+wire [ 5:0] ws_ext_int_in;
+wire [ 4:0] ws_excode;
+wire [31:0] ws_badvaddr;
+
 /* ------------------------------ LOGIC ------------------------------ */
 
-assign {ws_gr_we       ,  //69:69
+assign {ws_bd          ,  //82
+        ws_inst_eret   ,  //81
+        ws_inst_sysc   ,  //80
+        ws_inst_mfc0   ,  //79
+        ws_inst_mtc0   ,  //78
+        ws_sel         ,  //77:75
+        ws_rd          ,  //74:70
+        ws_gr_we       ,  //69:69
         ws_dest        ,  //68:64
         ws_final_result,  //63:32
         ws_pc             //31:0
@@ -52,7 +84,7 @@ always @(posedge clk) begin
         ws_valid <= 1'b0;
     end
     else if (ws_allowin) begin
-        ws_valid <= ms_to_ws_valid;
+        ws_valid <= ms_to_ws_valid & ~eret_flush;
     end
 
     if (ms_to_ws_valid && ws_allowin) begin
@@ -60,9 +92,44 @@ always @(posedge clk) begin
     end
 end
 
+// lab8
+assign ws_if_privil  = ws_inst_mfc0;
+assign ws_privil_res = ws_c0_rdata;
+
 assign rf_we    = ws_gr_we && ws_valid;
 assign rf_waddr = {5{ws_valid}} & ws_dest;
-assign rf_wdata = ws_final_result;
+assign rf_wdata = {32{~ws_if_privil}} & ws_final_result
+                | {32{ ws_if_privil}} & ws_privil_res;
+
+// lab8
+assign ws_c0_wdata = {32{ws_inst_mtc0}} & ws_final_result;
+assign ws_ex = ws_inst_sysc; //!
+assign ws_excode = {5{ws_inst_sysc}} & `EX_SYS;
+assign ws_badvaddr = ws_pc; //! maybe not correct
+
+assign pc_fr_epc = {32{ws_inst_eret}} & ws_c0_wdata;
+
+// lab8
+regs_c0 u_reg_c0(
+    .clk(clk),
+    .rst(reset),
+    .wb_valid(ws_valid),
+    .op_mtc0(ws_inst_mtc0),
+    .op_mfc0(ws_inst_mfc0),
+    .op_eret(ws_inst_eret),
+    .op_sysc(ws_inst_sysc),
+    .wb_ex(ws_ex), // if ex
+    .wb_rd(ws_rd),
+    .wb_sel(ws_sel),
+    .c0_wdata(ws_c0_wdata),
+    .c0_rdata(ws_c0_rdata),
+    .wb_bd(ws_bd),//if br delay slot
+    .ext_int_in(ws_ext_int_in),
+     .wb_excode(ws_excode),
+    .wb_pc(ws_pc),
+    .wb_badvaddr(ws_badvaddr)
+);
+
 
 // debug info generate
 assign debug_wb_pc       = ws_pc;

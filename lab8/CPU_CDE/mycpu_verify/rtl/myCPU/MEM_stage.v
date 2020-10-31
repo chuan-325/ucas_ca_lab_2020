@@ -14,6 +14,8 @@ module mem_stage(
     output [`MS_TO_WS_BUS_WD -1:0] ms_to_ws_bus  ,
     // to ds
     output [`MS_TO_DS_BUS_WD -1:0] ms_to_ds_bus  ,
+    // lab8: flush
+    output         eret_flush,
     //from data-sram
     input  [31                 :0] data_sram_rdata
 );
@@ -58,9 +60,31 @@ wire [31:0] mem_res_lwl;
 wire [31:0] mem_res_lhg;
 wire [31:0] mem_res_lbg;
 
+// lab8
+wire ms_inst_mtc0;
+wire ms_inst_mfc0;
+wire ms_inst_eret;
+wire ms_inst_sysc;
+wire [2:0] ms_sel;
+wire [4:0] ms_rd;
+
+wire ms_if_privil;
+
+wire ms_bd; // if inst is in branch-delay-slot
+
+//lab9
+reg flush;
+
 /* ------------------------------ LOGIC ------------------------------ */
 
-assign {ms_rt_value    , //110:79
+assign {ms_bd          , //123
+        ms_inst_eret   , //122
+        ms_inst_sysc   , //121
+        ms_inst_mfc0   , //120
+        ms_inst_mtc0   , //119
+        ms_sel         , //118:116
+        ms_rd          , //115:111
+        ms_rt_value    , //110:79
         ms_ls_laddr    , //78:77
         ms_ls_type     , //76:71
         ms_mem_re      , //70:70
@@ -76,7 +100,14 @@ assign ms_ls_laddr_d[2] = (ms_ls_laddr==2'b10);
 assign ms_ls_laddr_d[1] = (ms_ls_laddr==2'b01);
 assign ms_ls_laddr_d[0] = (ms_ls_laddr==2'b00);
 
-assign ms_to_ws_bus = {ms_gr_we       ,  //69:69
+assign ms_to_ws_bus = {ms_bd          ,  //82
+                       ms_inst_eret   ,  //81
+                       ms_inst_sysc   ,  //80
+                       ms_inst_mfc0   ,  //79
+                       ms_inst_mtc0   ,  //78
+                       ms_sel         ,  //77:75
+                       ms_rd          ,  //74:70
+                       ms_gr_we       ,  //69:69
                        ms_dest        ,  //68:64
                        ms_final_result,  //63:32
                        ms_pc             //31:0
@@ -94,7 +125,7 @@ always @(posedge clk) begin
         ms_valid <= 1'b0;
     end
     else if (ms_allowin) begin
-        ms_valid <= es_to_ms_valid;
+        ms_valid <= es_to_ms_valid & ~eret_flush;
     end
 
     if (es_to_ms_valid && ms_allowin) begin
@@ -142,8 +173,25 @@ assign mem_result = {32{ms_type_lwr}} & mem_res_lwr       // LWR
 
 /* Generate mem_res: begin */
 
+// lab8
+assign ms_if_privil = ms_inst_mtc0;
 
-assign ms_final_result = ms_mem_re ? mem_result
-                                   : ms_alu_result;
+assign ms_final_result = {32{~ms_if_privil}} & ({32{ ms_mem_re}} & mem_result
+                                                |{32{~ms_mem_re}} & ms_alu_result)
+                       | {32{ ms_if_privil}} & ms_rt_value;
+
+assign eret_flush = flush;
+
+always @(posedge clk) begin
+    if(reset)begin
+        flush <= 1'b0;
+    end
+    else if (ms_inst_eret)begin
+        flush <= 1'b1;
+    end
+    else begin
+        flush <= 1'b0;
+    end
+end
 
 endmodule

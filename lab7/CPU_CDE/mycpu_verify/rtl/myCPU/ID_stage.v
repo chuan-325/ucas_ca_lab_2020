@@ -390,10 +390,10 @@ assign inst_mult   = op_d[6'h00] & func_d[6'h18] & sa_d[5'h00];
 assign inst_multu  = op_d[6'h00] & func_d[6'h19] & sa_d[5'h00];
 assign inst_div    = op_d[6'h00] & func_d[6'h1a] & sa_d[5'h00];
 assign inst_divu   = op_d[6'h00] & func_d[6'h1b] & sa_d[5'h00];
-assign inst_mfhi   = op_d[6'h00] & func_d[6'h10] & sa_d[5'h00];
-assign inst_mflo   = op_d[6'h00] & func_d[6'h12] & sa_d[5'h00];
-assign inst_mthi   = op_d[6'h00] & func_d[6'h11] & sa_d[5'h00];
-assign inst_mtlo   = op_d[6'h00] & func_d[6'h13] & sa_d[5'h00];
+assign inst_mfhi   = op_d[6'h00] & func_d[6'h10] & sa_d[5'h00] & rs_d[5'h00] & rt_d[5'h00];
+assign inst_mflo   = op_d[6'h00] & func_d[6'h12] & sa_d[5'h00] & rs_d[5'h00] & rt_d[5'h00];
+assign inst_mthi   = op_d[6'h00] & func_d[6'h11] & sa_d[5'h00] & rd_d[5'h00] & rt_d[5'h00];
+assign inst_mtlo   = op_d[6'h00] & func_d[6'h13] & sa_d[5'h00] & rd_d[5'h00] & rt_d[5'h00];
 // lab7 newly added:
 assign inst_bgez   = op_d[6'h01] & rt_d[5'h01];
 assign inst_bgtz   = op_d[6'h07] & rt_d[5'h00];

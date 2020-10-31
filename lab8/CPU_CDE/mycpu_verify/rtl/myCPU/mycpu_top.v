@@ -43,6 +43,11 @@ wire  [`ES_TO_DS_BUS_WD -1:0] es_to_ds_bus;
 wire  [`MS_TO_DS_BUS_WD -1:0] ms_to_ds_bus;
 
 
+//lab8
+wire [31:0] pc_fr_epc;
+wire        eret_flush;
+
+
 // IF stage
 if_stage if_stage(
     .clk            (clk            ),
@@ -54,6 +59,9 @@ if_stage if_stage(
     //outputs
     .fs_to_ds_valid (fs_to_ds_valid ),
     .fs_to_ds_bus   (fs_to_ds_bus   ),
+    //lab8 flush
+    .pc_fr_epc      (pc_fr_epc      ),
+    .eret_flush     (eret_flush     ),
     // inst sram interface
     .inst_sram_en   (inst_sram_en   ),
     .inst_sram_wen  (inst_sram_wen  ),
@@ -80,6 +88,8 @@ id_stage id_stage(
     .ds_to_es_bus   (ds_to_es_bus   ),
     //to fs
     .br_bus         (br_bus         ),
+    //lab8 flush
+    .eret_flush     (eret_flush     ),
     //to rf: for write back
     .ws_to_rf_bus   (ws_to_rf_bus   )
 );
@@ -98,6 +108,8 @@ exe_stage exe_stage(
     .es_to_ms_bus   (es_to_ms_bus   ),
     //to ds raw
     .es_to_ds_bus   (es_to_ds_bus   ),
+    //lab8 flush
+    .eret_flush     (eret_flush     ),
     // data sram interface
     .data_sram_en   (data_sram_en   ),
     .data_sram_wen  (data_sram_wen  ),
@@ -119,6 +131,8 @@ mem_stage mem_stage(
     .ms_to_ws_bus   (ms_to_ws_bus   ),
     //to ds raw
     .ms_to_ds_bus   (ms_to_ds_bus   ),
+    //lab8 flush
+    .eret_flush     (eret_flush     ),
     //from data-sram
     .data_sram_rdata(data_sram_rdata)
 );
@@ -133,6 +147,9 @@ wb_stage wb_stage(
     .ms_to_ws_bus   (ms_to_ws_bus   ),
     //to rf: for write back
     .ws_to_rf_bus   (ws_to_rf_bus   ),
+    //lab8 flush
+    .pc_fr_epc      (pc_fr_epc      ),
+    .eret_flush     (eret_flush     ),
     //trace debug interface
     .debug_wb_pc      (debug_wb_pc      ),
     .debug_wb_rf_wen  (debug_wb_rf_wen  ),

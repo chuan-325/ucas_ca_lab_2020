@@ -18,6 +18,8 @@ module id_stage(
     output [`DS_TO_ES_BUS_WD -1:0] ds_to_es_bus  ,
     //to fs
     output [`BR_BUS_WD       -1:0] br_bus        ,
+    // lab8: flush
+    input         eret_flush,
     //to rf: for write back
     input  [`WS_TO_RF_BUS_WD -1:0] ws_to_rf_bus
 );
@@ -69,6 +71,7 @@ wire [ 4:0] rd;
 wire [ 4:0] sa;
 wire [ 5:0] func;
 wire [25:0] jidx;
+
 wire [63:0] op_d;
 wire [31:0] rs_d;
 wire [31:0] rt_d;
@@ -137,7 +140,6 @@ wire        inst_blez;
 wire        inst_bltz;
 wire        inst_bltzal;
 wire        inst_bgezal;
-
 // jump
 wire        inst_jal;
 wire        inst_jr;
@@ -188,12 +190,25 @@ wire rs_eq_dests;
 wire rt_eq_dests;
 wire st_eq_dests;
 
+// lab8
+wire inst_mtc0;
+wire inst_mfc0;
+wire inst_eret;
+wire inst_sysc;
+
+wire [2:0] ds_sel;
+wire [7:0] in10_3;
+
+wire ds_bd; // if inst is in branch-delay-slot
+
 /* ------------------------------ LOGIC ------------------------------ */
 
 assign fs_pc = fs_to_ds_bus[31:0];
 
-assign {ds_inst,
-        ds_pc  } = fs_to_ds_bus_r;
+assign {ds_bd  , //64
+        ds_inst, //63:32
+        ds_pc    //31:0
+        } = fs_to_ds_bus_r;
 
 assign {rf_we   ,  //37:37
         rf_waddr,  //36:32
@@ -202,14 +217,25 @@ assign {rf_we   ,  //37:37
 
 assign es_res_valid = es_to_ds_bus[37];
 
-assign es_dest = es_to_ds_bus[36:32]  ;
-assign ms_dest = ms_to_ds_bus[36:32]  ;
+assign es_dest = es_to_ds_bus[36:32];
+assign ms_dest = ms_to_ds_bus[36:32];
 assign ws_dest = rf_waddr & {5{rf_we}};
 assign es_res  = es_to_ds_bus[31:0];
 assign ms_res  = ms_to_ds_bus[31:0];
 
-assign br_bus       = {br_stall, br_taken, br_target};
-assign ds_to_es_bus = {ls_type    ,  //149:144
+assign br_bus       = {br_stall,    // 33
+                       br_taken,    // 32
+                       br_target    // 31:0
+                       };
+// lab8 modified
+assign ds_to_es_bus = {ds_bd      ,  //162
+                       inst_eret  ,  //161
+                       inst_sysc  ,  //160
+                       inst_mfc0  ,  //159
+                       inst_mtc0  ,  //158
+                       ds_sel     ,  //157:155
+                       rd         ,  //154:150
+                       ls_type    ,  //149:144
                        inst_mtlo  ,  //143     | op
                        inst_mthi  ,  //142
                        inst_mflo  ,  //141
@@ -331,7 +357,7 @@ always @(posedge clk) begin
         ds_valid <= 1'b0;
     end
     else if (ds_allowin) begin
-        ds_valid <= fs_to_ds_valid;
+        ds_valid <= fs_to_ds_valid & ~eret_flush;
     end
     if (fs_to_ds_valid && ds_allowin) begin
         fs_to_ds_bus_r <= fs_to_ds_bus;
@@ -346,6 +372,9 @@ assign sa   = ds_inst[10: 6];
 assign func = ds_inst[ 5: 0];
 assign imm  = ds_inst[15: 0];
 assign jidx = ds_inst[25: 0];
+// lab8
+assign ds_sel = ds_inst[ 2:0];
+assign in10_3 = ds_inst[10:3];
 
 decoder_6_64 u_dec0(.in(op  ), .out(op_d  ));
 decoder_6_64 u_dec1(.in(func), .out(func_d));
@@ -413,10 +442,16 @@ assign inst_mult   = op_d[6'h00] & func_d[6'h18] & sa_d[5'h00];
 assign inst_multu  = op_d[6'h00] & func_d[6'h19] & sa_d[5'h00];
 assign inst_div    = op_d[6'h00] & func_d[6'h1a] & sa_d[5'h00];
 assign inst_divu   = op_d[6'h00] & func_d[6'h1b] & sa_d[5'h00];
-assign inst_mfhi   = op_d[6'h00] & func_d[6'h10] & sa_d[5'h00];
-assign inst_mflo   = op_d[6'h00] & func_d[6'h12] & sa_d[5'h00];
-assign inst_mthi   = op_d[6'h00] & func_d[6'h11] & sa_d[5'h00];
-assign inst_mtlo   = op_d[6'h00] & func_d[6'h13] & sa_d[5'h00];
+assign inst_mfhi   = op_d[6'h00] & func_d[6'h10] & sa_d[5'h00] & rs_d[5'h00] & rt_d[5'h00];
+assign inst_mflo   = op_d[6'h00] & func_d[6'h12] & sa_d[5'h00] & rs_d[5'h00] & rt_d[5'h00];
+assign inst_mthi   = op_d[6'h00] & func_d[6'h11] & sa_d[5'h00] & rd_d[5'h00] & rt_d[5'h00];
+assign inst_mtlo   = op_d[6'h00] & func_d[6'h13] & sa_d[5'h00] & rd_d[5'h00] & rt_d[5'h00];
+
+// lab8 new
+assign inst_mtc0 = op_d[6'h10] & rs_d[5'h04] & sa_d[5'h00] & ~|func[5:3];
+assign inst_mfc0 = op_d[6'h10] & rs_d[5'h00] & sa_d[5'h00] & ~|func[5:3];
+assign inst_eret = op_d[6'h10] & rs_d[5'h10] & rt_d[5'h00] & rd_d[5'h00] & sa_d[5'h00] & func_d[6'h18];
+assign inst_sysc = op_d[6'h00] & func_d[6'h0b];
 
 assign alu_op[ 0] = |{inst_addu, inst_addiu, inst_add, inst_addi,
                       inst_lw, inst_lwl, inst_lwr,
@@ -462,14 +497,16 @@ assign dst_is_rt   = |{inst_addiu, inst_addi, inst_slti, inst_sltiu,
                        inst_lui,
                        inst_lw,
                        inst_lb, inst_lbu, inst_lh, inst_lhu,
-                       inst_lwl, inst_lwr
+                       inst_lwl, inst_lwr,
+                       inst_mfc0 // lab8
                       };
 assign gr_we       = ~|{inst_sw, inst_sb, inst_sh, inst_swl, inst_swr,
                         inst_beq, inst_bne, inst_bgez, inst_bgtz, inst_blez, inst_bltz,
                         inst_jr, inst_j,
                         inst_mult, inst_multu,
                         inst_div, inst_divu,
-                        inst_mthi, inst_mtlo
+                        inst_mthi, inst_mtlo,
+                        inst_mtc0 // lab8
                        };
 
 assign mem_re = inst_lw
@@ -531,17 +568,25 @@ assign br_taken = ( inst_beq    &  rs_eq_rt
                   | inst_jalr
                   | inst_j
                   | inst_jr
+                  | inst_sysc // lab8
                   ) && ds_valid;
-assign br_target = ( inst_beq
+
+// lab8
+wire inst_branch;
+wire inst_jxr;
+assign inst_branch = inst_beq
                    | inst_bne
                    | inst_bgez
                    | inst_bgtz
                    | inst_blez
                    | inst_bltz
                    | inst_bltzal
-                   | inst_bgezal) ? (fs_pc + {{14{imm[15]}}, imm[15:0], 2'b0}) :
-                    (inst_jr
-                   | inst_jalr)   ?  rs_value :
-                     /*jal/j*/      {fs_pc[31:28], jidx[25:0], 2'b0};
+                   | inst_bgezal;
+assign inst_jxr    = inst_jr
+                   | inst_jalr;
+assign br_target   = {32{inst_branch}} & (fs_pc + {{14{imm[15]}}, imm[15:0], 2'b0})
+                   | {32{inst_jxr}}    &  rs_value
+                   | {32{inst_jal}}    & {fs_pc[31:28], jidx[25:0], 2'b0}
+                   | {32{inst_sysc}}   &  32'hbfc00380;
 
 endmodule

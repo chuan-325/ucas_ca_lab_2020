@@ -14,6 +14,8 @@ module exe_stage(
     output [`ES_TO_MS_BUS_WD -1:0] es_to_ms_bus   ,
     // to ds
     output [`ES_TO_DS_BUS_WD -1:0] es_to_ds_bus   ,
+    // lab8: flush
+    input         eret_flush,
     // data sram interface
     output                         data_sram_en   ,
     output [ 3:0]                  data_sram_wen  ,
@@ -106,9 +108,27 @@ wire [31:0] write_data_sb;
 wire [ 3:0] write_strb;
 wire [31:0] write_data;
 
+// lab8
+wire es_inst_mtc0;
+wire es_inst_mfc0;
+wire es_inst_sysc;
+wire es_inst_eret;
+wire [2:0] es_sel;
+wire [4:0] es_rd;
+
+wire es_bd; // if inst is in branch-delay-slot
+
+
 /* ------------------------------ LOGIC ------------------------------ */
 
-assign {es_ls_type     ,  //149:144
+assign {es_bd          ,  //162
+        es_inst_eret   ,  //161
+        es_inst_sysc   ,  //160
+        es_inst_mfc0   ,  //159
+        es_inst_mtc0   ,  //158
+        es_sel         ,  //157:155
+        es_rd          ,  //154:150
+        es_ls_type     ,  //149:144
         es_inst_mtlo   ,  //143
         es_inst_mthi   ,  //142
         es_inst_mflo   ,  //141
@@ -139,14 +159,21 @@ assign es_ls_laddr_d[2] = (es_ls_laddr==2'b10);
 assign es_ls_laddr_d[1] = (es_ls_laddr==2'b01);
 assign es_ls_laddr_d[0] = (es_ls_laddr==2'b00);
 
-assign es_to_ms_bus = {es_rt_value, //110:79
-                       es_ls_laddr, //78:77
-                       es_ls_type , //76:71
-                       es_mem_re  , //70:70
-                       es_gr_we   , //69:69
-                       es_dest    , //68:64
-                       es_res_r   , //63:32 originally es_alu_result
-                       es_pc        //31:0
+assign es_to_ms_bus = {es_bd       ,  //123
+                       es_inst_eret,  //122
+                       es_inst_sysc,  //121
+                       es_inst_mfc0,  //120
+                       es_inst_mtc0,  //119
+                       es_sel      ,  //118:116
+                       es_rd       ,  //115:111
+                       es_rt_value , //110:79
+                       es_ls_laddr , //78:77
+                       es_ls_type  , //76:71
+                       es_mem_re   , //70:70
+                       es_gr_we    , //69:69
+                       es_dest     , //68:64
+                       es_res_r    , //63:32 originally es_alu_result
+                       es_pc         //31:0
                       };
 assign es_to_ds_bus = {`ES_TO_DS_BUS_WD{ es_valid
                                        & es_gr_we}} & {~es_mem_re, //37    es_res_valid
@@ -164,7 +191,7 @@ always @(posedge clk) begin
         es_valid <= 1'b0;
     end
     else if (es_allowin) begin
-        es_valid <= ds_to_es_valid;
+        es_valid <= ds_to_es_valid & ~eret_flush;
     end
 
     if (ds_to_es_valid && es_allowin) begin
