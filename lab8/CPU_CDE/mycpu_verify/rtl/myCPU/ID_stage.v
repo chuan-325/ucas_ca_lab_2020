@@ -316,7 +316,7 @@ always @(posedge clk) begin
         ds_bd <= 1'b0;
     end
     else begin
-        ds_bd <= inst_branch | inst_jxr | inst_jnr;
+        ds_bd <= (inst_branch | inst_jxr | inst_jnr) & ds_valid;
     end
 end
 

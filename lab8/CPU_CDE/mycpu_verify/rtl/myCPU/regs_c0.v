@@ -158,7 +158,10 @@ assign c0_cause = {c0_cause_bd,
  */
 reg [31:0] c0_epc;
 always @(posedge clk) begin
-    if (wb_ex && !c0_status_exl) begin
+    if (rst) begin
+        c0_epc <= 32'b0;
+    end
+    else if (wb_ex && !c0_status_exl) begin
         c0_epc <= wb_bd ? wb_pc - 3'h4 : wb_pc;
     end
     else if (mtc0_we && c0_addr == `CR_EPC) begin
@@ -185,16 +188,22 @@ assign c0_rdata = {32{read_c0_status}} & c0_status
 /*
  * BadVAddr
  */
+
 reg [31:0] c0_badvaddr;
 always @(posedge clk) begin
-    if (wb_ex && wb_excode == `EX_ADEL) begin
+    if (rst) begin
+        c0_badvaddr <= 32'b0;
+    end
+    else if (wb_ex && wb_excode == `EX_ADEL) begin
         c0_badvaddr <= wb_badvaddr;
     end
 end
 
+
 /*
  * Count
  */
+
 reg        tick;
 reg [31:0] c0_count;
 always @(posedge clk) begin
@@ -205,7 +214,10 @@ always @(posedge clk) begin
         tick <= ~tick;
     end
 
-    if (mtc0_we && c0_addr == `CR_COUNT) begin
+    if (rst) begin
+        c0_count <= 32'b0;
+    end
+    else if (mtc0_we && c0_addr == `CR_COUNT) begin
         c0_count <= c0_wdata;
     end
     else if (tick) begin
