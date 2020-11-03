@@ -11,8 +11,8 @@ module if_stage(
     output                         fs_to_ds_valid ,
     output [`FS_TO_DS_BUS_WD -1:0] fs_to_ds_bus   ,
     // lab8: flush
-    input  [31:0] ws_pc_gen_exc,
-    input         exc_flush,
+    input  [31:0] ws_pc_gen_exc  ,
+    input         exc_flush      ,
     // inst sram interface
     output        inst_sram_en   ,
     output [ 3:0] inst_sram_wen  ,
@@ -32,14 +32,14 @@ wire        to_fs_ready_go;
 wire [31:0] seq_pc;
 wire [31:0] nextpc;
 
-wire         br_stall;
-wire         br_taken;
-wire [ 31:0] br_target;
+wire        br_stall;
+wire        br_taken;
+wire [31:0] br_target;
 
 wire [31:0] fs_inst;
 reg  [31:0] fs_pc;
 
-wire fs_flush;
+wire        fs_flush;
 
 /* ------------------------------ LOGIC ------------------------------ */
 
@@ -48,12 +48,12 @@ assign {br_stall,
         br_target
        } = br_bus;
 
-// lab8
-assign fs_flush = exc_flush;
-
 assign fs_to_ds_bus = {fs_flush,  //64
                        fs_inst ,  //63:32
                        fs_pc   }; //31: 0
+
+// lab8
+assign fs_flush = exc_flush;
 
 // pre-IF stage
 assign to_fs_ready_go = ~br_stall;
@@ -84,6 +84,7 @@ always @(posedge clk) begin
         fs_pc <= nextpc;
     end
 end
+
 
 assign inst_sram_en    = to_fs_valid && fs_allowin;
 assign inst_sram_wen   = 4'h0;

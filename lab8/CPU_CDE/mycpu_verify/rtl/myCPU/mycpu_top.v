@@ -61,7 +61,7 @@ if_stage if_stage(
     .fs_to_ds_bus   (fs_to_ds_bus   ),
     //lab8 flush
     .ws_pc_gen_exc  (ws_pc_gen_exc  ),
-    .exc_flush     (exc_flush     ),
+    .exc_flush      (exc_flush     ),
     // inst sram interface
     .inst_sram_en   (inst_sram_en   ),
     .inst_sram_wen  (inst_sram_wen  ),

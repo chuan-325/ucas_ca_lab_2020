@@ -37,11 +37,6 @@ reg [31:0] lo;
 
 reg  [`DS_TO_ES_BUS_WD -1:0] ds_to_es_bus_r;
 
-
-wire [ 5:0] es_ls_type    ;
-wire [ 1:0] es_ls_laddr   ;
-wire [ 3:0] es_ls_laddr_d ;
-
 // lab8
 wire es_inst_mtc0;
 wire es_inst_mfc0;
@@ -122,9 +117,12 @@ wire [31:0] write_data_sb;
 wire [ 3:0] write_strb;
 wire [31:0] write_data;
 
-// lab8
-wire [2:0] es_sel;
+wire [2:0] es_sel;// lab8
 wire [4:0] es_rd;
+
+wire [5:0] es_ls_type   ;
+wire [1:0] es_ls_laddr  ;
+wire [3:0] es_ls_laddr_d;
 
 wire es_bd; // if inst is in branch-delay-slot
 wire es_res_valid;
@@ -154,7 +152,7 @@ assign {ds_flush       ,  //163
         es_op_multu    ,  //137
         es_op_mult     ,  //136
         es_alu_op      ,  //135:124
-        es_mem_re     ,  //123:123
+        es_mem_re      ,  //123:123
         es_src1_is_sa  ,  //122:122
         es_src1_is_pc  ,  //121:121
         es_src2_is_imm ,  //120:120
@@ -178,8 +176,8 @@ assign es_ls_laddr_d[0] = (es_ls_laddr==2'b00);
 
 // lab8
 assign es_flush = exc_flush | ds_flush;
-assign es_ex = es_inst_eret
-             | es_inst_sysc;
+assign es_ex    = es_inst_eret
+                | es_inst_sysc;
 
 assign es_to_ms_bus = {es_flush    ,  //124
                        es_bd       ,  //123
@@ -260,10 +258,9 @@ assign es_alu_src2 = es_src2_is_imm ? es_alu_src2_imm       :
 
 
 /* 33-bit multiplier: begin */
-
-assign es_mult_a    = {es_op_mult & es_alu_src1[31], es_alu_src1};
-assign es_mult_b    = {es_op_mult & es_alu_src2[31], es_alu_src2};
-assign es_mult_result = $signed(es_mult_a) * $signed(es_mult_b);
+assign es_mult_a      = {es_op_mult & es_alu_src1[31], es_alu_src1};
+assign es_mult_b      = {es_op_mult & es_alu_src2[31], es_alu_src2};
+assign es_mult_result = $signed(es_mult_a) * $signed(es_mult_b)    ;
 /* 33-bit multiplier: end */
 
 
@@ -271,57 +268,52 @@ assign es_mult_result = $signed(es_mult_a) * $signed(es_mult_b);
 // Gerneral input
 assign es_dividend = {32{es_op_div|es_op_divu}} & es_alu_src1;
 assign es_divisor  = {32{es_op_div|es_op_divu}} & es_alu_src2;
-
 /* div begin */
 // div input sending valid
 assign es_div_in_ready = es_div_end_ready & es_div_sor_ready;
-
 always @(posedge clk ) begin
     if (reset) begin                                   // reset
         es_div_end_valid <= 1'b0;
         es_div_sor_valid <= 1'b0;
-        es_div_in_flag  <= 1'b0;
+        es_div_in_flag   <= 1'b0;
     end
     else if (~es_div_in_flag & es_op_div) begin       // valid: require ready
         es_div_end_valid <= 1'b1;
         es_div_sor_valid <= 1'b1;
-        es_div_in_flag  <= 1'b1;
+        es_div_in_flag   <= 1'b1;
     end
     else if (es_div_in_flag & es_div_in_ready) begin  // ready & flag
         es_div_end_valid <= 1'b0;
         es_div_sor_valid <= 1'b0;
     end
     else if (es_div_in_flag & es_div_out_valid) begin // flag set to 1'b0
-        es_div_in_flag <= 1'b0;
+        es_div_in_flag   <= 1'b0;
     end
 end
 /* div end */
-
 /* divu begin */
 // divu input sending valid
 assign es_divu_in_ready = es_divu_end_ready & es_divu_sor_ready;
-
 always @(posedge clk ) begin
     if (reset) begin                                     // reset
         es_divu_end_valid <= 1'b0;
         es_divu_sor_valid <= 1'b0;
-        es_divu_in_flag  <= 1'b0;
+        es_divu_in_flag   <= 1'b0;
     end
     else if (~es_divu_in_flag & es_op_divu) begin       // valid: require ready
         es_divu_end_valid <= 1'b1;
         es_divu_sor_valid <= 1'b1;
-        es_divu_in_flag  <= 1'b1;
+        es_divu_in_flag   <= 1'b1;
     end
     else if (es_divu_in_flag & es_divu_in_ready) begin  // ready & flag
         es_divu_end_valid <= 1'b0;
         es_divu_sor_valid <= 1'b0;
     end
     else if (es_divu_in_flag & es_divu_out_valid) begin // flag set to 1'b0
-        es_divu_in_flag <= 1'b0;
+        es_divu_in_flag  <= 1'b0;
     end
 end
 /* divu end */
-
 /* 32-bit dividers (my_div, my_divu): end */
 
 
@@ -332,12 +324,12 @@ assign es_hilo_we   = es_op_mult
                     | es_op_divu &  es_divu_out_valid;
 assign es_hilo_we_r = es_hilo_we & ~es_flush & ~es_pre_flush; //lab8
 
-assign es_hi_res = {32{es_op_mult|es_op_multu}} & es_mult_result[63:32]
-                 | {32{es_op_div             }} & es_div_dout[31:0]
-                 | {32{es_op_divu            }} & es_divu_dout[31:0];
-assign es_lo_res = {32{es_op_mult|es_op_multu}} & es_mult_result[31:0]
-                 | {32{es_op_div             }} & es_div_dout[63:32]
-                 | {32{es_op_divu            }} & es_divu_dout[63:32];
+assign es_hi_res    = {32{es_op_mult|es_op_multu}} & es_mult_result[63:32]
+                    | {32{es_op_div             }} & es_div_dout[31:0]
+                    | {32{es_op_divu            }} & es_divu_dout[31:0];
+assign es_lo_res    = {32{es_op_mult|es_op_multu}} & es_mult_result[31:0]
+                    | {32{es_op_div             }} & es_div_dout[63:32]
+                    | {32{es_op_divu            }} & es_divu_dout[63:32];
 
 always @(posedge clk) begin
     if (reset) begin
@@ -355,7 +347,6 @@ always @(posedge clk) begin
         lo <= es_rs_value;
     end
 end
-
 /* HI, LO R&W: end */
 
 
@@ -405,7 +396,6 @@ assign es_res_r = {32{  es_inst_mfhi}}  & hi
                        |es_inst_mflo)}} & es_alu_result ;
 
 /*  Generate write_strb & write data: begin */
-
 // prepare write_strb selection
 assign write_strb_swr = {4{ es_ls_laddr_d[0]}} & 4'b1111 // SWR
                       | {4{ es_ls_laddr_d[1]}} & 4'b1110
@@ -421,7 +411,6 @@ assign write_strb_sb  = {4{ es_ls_laddr_d[0]}} & 4'b0001 // SB
                       | {4{ es_ls_laddr_d[1]}} & 4'b0010
                       | {4{ es_ls_laddr_d[2]}} & 4'b0100
                       | {4{ es_ls_laddr_d[3]}} & 4'b1000;
-
 // prepare write_data selection
 assign write_data_swr = {32{es_ls_laddr_d[0]}} &  es_rt_value                // SWR
                       | {32{es_ls_laddr_d[1]}} & {es_rt_value[23:0],  8'b0}
@@ -433,7 +422,6 @@ assign write_data_swl = {32{es_ls_laddr_d[0]}} & {24'b0, es_rt_value[31:24]} // 
                       | {32{es_ls_laddr_d[3]}} &  es_rt_value;
 assign write_data_sh = {2{es_rt_value[15:0]}};                               // SH
 assign write_data_sb = {4{es_rt_value[ 7:0]}};                               // SB
-
 // Generate correct write_strb & write_data
 assign write_strb = {4{ es_ls_type[4]}} & write_strb_swr // SWR
                   | {4{ es_ls_type[3]}} & write_strb_swl // SWL
@@ -445,9 +433,7 @@ assign write_data = {32{es_ls_type[4]}} & write_data_swr // SWR
                   | {32{es_ls_type[2]}} & write_data_sh  // SH
                   | {32{es_ls_type[1]}} & write_data_sb  // SB
                   | {32{es_ls_type[0]}} & es_rt_value;   // SW
-
 /* Generate write_strb & write data: end */
-
 
 assign data_sram_en    = ~es_pre_flush & ~es_flush; // lab8
 assign data_sram_wen   = es_mem_we_r & es_valid ? write_strb : 4'h0; //lab8

@@ -11,8 +11,8 @@ module wb_stage(
     //to rf: for write back
     output [`WS_TO_RF_BUS_WD -1:0]  ws_to_rf_bus  ,
     // lab8: flush
-    output exc_flush,
-    output [31:0] ws_pc_gen_exc,
+    output                          exc_flush     ,
+    output [31:0]                   ws_pc_gen_exc ,
     //trace debug interface
     output [31:0] debug_wb_pc     ,
     output [ 3:0] debug_wb_rf_wen ,

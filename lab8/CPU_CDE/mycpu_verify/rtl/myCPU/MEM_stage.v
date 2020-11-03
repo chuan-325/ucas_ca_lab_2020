@@ -26,6 +26,7 @@ reg         ms_valid;
 wire        ms_ready_go;
 
 reg [`ES_TO_MS_BUS_WD -1:0] es_to_ms_bus_r;
+
 wire [31:0] ms_rt_value;
 wire [ 1:0] ms_ls_laddr;
 wire [ 5:0] ms_ls_type;
@@ -35,12 +36,11 @@ wire [ 4:0] ms_dest;
 wire [31:0] ms_alu_result;
 wire [31:0] ms_pc;
 
-wire ms_flush;
-wire es_flush;
+wire        ms_flush;
+wire        es_flush;
 
-// lab8
-wire [2:0] ms_sel;
-wire [4:0] ms_rd;
+wire [ 2:0] ms_sel; // lab8
+wire [ 4:0] ms_rd;
 wire [ 3:0] ms_ls_laddr_d;
 
 wire mem_res_s_07; // prepare hight bit in byte
@@ -145,20 +145,17 @@ always @(posedge clk) begin
 end
 
 /* Generate mem_res: begin */
-
 // prepare load type
-assign ms_type_lwr = ms_ls_type[4];
-assign ms_type_lwl = ms_ls_type[3];
-assign ms_type_lhg = ms_ls_type[2]; // lh/lhu
-assign ms_type_lbg = ms_ls_type[1]; // lb/lbu
-assign ms_type_lw  = ms_ls_type[0];
-
+assign ms_type_lwr =  ms_ls_type[4];
+assign ms_type_lwl =  ms_ls_type[3];
+assign ms_type_lhg =  ms_ls_type[2]; // lh/lhu
+assign ms_type_lbg =  ms_ls_type[1]; // lb/lbu
+assign ms_type_lw  =  ms_ls_type[0];
 // prepare hight bit in byte
 assign mem_res_s_07 = ~ms_ls_type[5] & data_sram_rdata[ 7];
 assign mem_res_s_15 = ~ms_ls_type[5] & data_sram_rdata[15];
 assign mem_res_s_23 = ~ms_ls_type[5] & data_sram_rdata[23];
 assign mem_res_s_31 = ~ms_ls_type[5] & data_sram_rdata[31];
-
 // prepare mem_res selection
 assign mem_res_lwr = {32{ms_ls_laddr_d[0]}} &  data_sram_rdata[31:0]                       // LWR
                    | {32{ms_ls_laddr_d[1]}} & {ms_rt_value[31:24], data_sram_rdata[31: 8]}
@@ -174,21 +171,19 @@ assign mem_res_lbg = {32{ms_ls_laddr_d[0]}} & {{24{mem_res_s_07}}, data_sram_rda
                    | {32{ms_ls_laddr_d[1]}} & {{24{mem_res_s_15}}, data_sram_rdata[15: 8]}
                    | {32{ms_ls_laddr_d[2]}} & {{24{mem_res_s_23}}, data_sram_rdata[23:16]}
                    | {32{ms_ls_laddr_d[3]}} & {{24{mem_res_s_31}}, data_sram_rdata[31:24]};
-
 // Generate correct mem_res
-assign mem_result = {32{ms_type_lwr}} & mem_res_lwr       // LWR
-                  | {32{ms_type_lwl}} & mem_res_lwl       // LWL
-                  | {32{ms_type_lhg}} & mem_res_lhg       // LH/LHU
-                  | {32{ms_type_lbg}} & mem_res_lbg       // LB/LBU
-                  | {32{ms_type_lw }} & data_sram_rdata ; // LW
-
+assign mem_result = {32{ms_type_lwr}} & mem_res_lwr      // LWR
+                  | {32{ms_type_lwl}} & mem_res_lwl      // LWL
+                  | {32{ms_type_lhg}} & mem_res_lhg      // LH/LHU
+                  | {32{ms_type_lbg}} & mem_res_lbg      // LB/LBU
+                  | {32{ms_type_lw }} & data_sram_rdata; // LW
 /* Generate mem_res: begin */
 
 // lab8
 assign ms_if_privil = ms_inst_mtc0;
 
 assign ms_final_result = {32{~ms_if_privil}} & ({32{ ms_mem_re}} & mem_result
-                                                |{32{~ms_mem_re}} & ms_alu_result)
+                                               |{32{~ms_mem_re}} & ms_alu_result)
                        | {32{ ms_if_privil}} & ms_rt_value;
 
 endmodule
