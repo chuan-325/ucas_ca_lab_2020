@@ -15,7 +15,7 @@ module mem_stage(
     // to ds
     output [`MS_TO_DS_BUS_WD -1:0] ms_to_ds_bus  ,
     // lab8: flush
-    output         eret_flush,
+    input                          exc_flush,
     //from data-sram
     input  [31                 :0] data_sram_rdata
 );
@@ -34,12 +34,28 @@ wire        ms_gr_we;
 wire [ 4:0] ms_dest;
 wire [31:0] ms_alu_result;
 wire [31:0] ms_pc;
+
+wire ms_flush;
+wire es_flush;
+
+// lab8
+wire [2:0] ms_sel;
+wire [4:0] ms_rd;
 wire [ 3:0] ms_ls_laddr_d;
+
+wire mem_res_s_07; // prepare hight bit in byte
+wire mem_res_s_15;
+wire mem_res_s_23;
+wire mem_res_s_31;
 
 wire [31:0] mem_result;
 wire [31:0] ms_final_result;
 
-// prepare load type
+//lab8
+wire ms_inst_mtc0;
+wire ms_inst_mfc0;
+wire ms_inst_eret;
+wire ms_inst_sysc;
 wire ms_type_lwr;
 wire ms_type_lwl;
 wire ms_type_lhu;
@@ -48,36 +64,22 @@ wire ms_type_lbu;
 wire ms_type_lb;
 wire ms_type_lw;
 
-// prepare hight bit in byte
-wire mem_res_s_07;
-wire mem_res_s_15;
-wire mem_res_s_23;
-wire mem_res_s_31;
-
 // prepare mem_res selection
 wire [31:0] mem_res_lwr;
 wire [31:0] mem_res_lwl;
 wire [31:0] mem_res_lhg;
 wire [31:0] mem_res_lbg;
 
-// lab8
-wire ms_inst_mtc0;
-wire ms_inst_mfc0;
-wire ms_inst_eret;
-wire ms_inst_sysc;
-wire [2:0] ms_sel;
-wire [4:0] ms_rd;
-
 wire ms_if_privil;
 
 wire ms_bd; // if inst is in branch-delay-slot
 
-//lab9
-reg flush;
+wire ms_res_valid;
 
 /* ------------------------------ LOGIC ------------------------------ */
 
-assign {ms_bd          , //123
+assign {es_flush       , //123
+        ms_bd          , //123
         ms_inst_eret   , //122
         ms_inst_sysc   , //121
         ms_inst_mfc0   , //120
@@ -100,7 +102,9 @@ assign ms_ls_laddr_d[2] = (ms_ls_laddr==2'b10);
 assign ms_ls_laddr_d[1] = (ms_ls_laddr==2'b01);
 assign ms_ls_laddr_d[0] = (ms_ls_laddr==2'b00);
 
-assign ms_to_ws_bus = {ms_bd          ,  //82
+assign ms_flush = exc_flush | es_flush;
+assign ms_to_ws_bus = {ms_flush       ,  //83
+                       ms_bd          ,  //82
                        ms_inst_eret   ,  //81
                        ms_inst_sysc   ,  //80
                        ms_inst_mfc0   ,  //79
@@ -112,24 +116,31 @@ assign ms_to_ws_bus = {ms_bd          ,  //82
                        ms_final_result,  //63:32
                        ms_pc             //31:0
                       };
+// lab8
+assign ms_res_valid = ~ms_inst_mfc0;
+
 assign ms_to_ds_bus = {`MS_TO_DS_BUS_WD{ ms_valid
-                                       & ms_gr_we}} & {ms_dest,         // 36:32 ms_dest
-                                                       ms_final_result  // 31: 0 ms_res
-                                                      };
+                                       & ms_gr_we
+                                       }} & {ms_res_valid,    // 37
+                                             ms_dest,         // 36:32 ms_dest
+                                             ms_final_result  // 31: 0 ms_res
+                                             };
 
 assign ms_ready_go    = 1'b1;
-assign ms_allowin     = !ms_valid || ms_ready_go && ws_allowin;
+assign ms_allowin     = !ms_valid
+                      || ms_ready_go && ws_allowin
+                      || exc_flush;
 assign ms_to_ws_valid = ms_valid && ms_ready_go;
 always @(posedge clk) begin
     if (reset) begin
         ms_valid <= 1'b0;
     end
     else if (ms_allowin) begin
-        ms_valid <= es_to_ms_valid & ~eret_flush;
+        ms_valid <= es_to_ms_valid;
     end
 
     if (es_to_ms_valid && ms_allowin) begin
-        es_to_ms_bus_r  <= es_to_ms_bus;
+        es_to_ms_bus_r <= es_to_ms_bus;
     end
 end
 
@@ -179,19 +190,5 @@ assign ms_if_privil = ms_inst_mtc0;
 assign ms_final_result = {32{~ms_if_privil}} & ({32{ ms_mem_re}} & mem_result
                                                 |{32{~ms_mem_re}} & ms_alu_result)
                        | {32{ ms_if_privil}} & ms_rt_value;
-
-assign eret_flush = flush;
-
-always @(posedge clk) begin
-    if(reset)begin
-        flush <= 1'b0;
-    end
-    else if (ms_inst_eret)begin
-        flush <= 1'b1;
-    end
-    else begin
-        flush <= 1'b0;
-    end
-end
 
 endmodule

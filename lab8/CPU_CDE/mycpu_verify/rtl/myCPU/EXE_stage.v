@@ -15,7 +15,7 @@ module exe_stage(
     // to ds
     output [`ES_TO_DS_BUS_WD -1:0] es_to_ds_bus   ,
     // lab8: flush
-    input         eret_flush,
+    input         exc_flush,
     // data sram interface
     output                         data_sram_en   ,
     output [ 3:0]                  data_sram_wen  ,
@@ -29,23 +29,33 @@ reg  es_valid;
 wire es_ready_go;
 
 wire es_hilo_we;
+wire es_hilo_we_r;
 
 // register: HI, LO
 reg [31:0] hi;
 reg [31:0] lo;
 
 reg  [`DS_TO_ES_BUS_WD -1:0] ds_to_es_bus_r;
+
+
 wire [ 5:0] es_ls_type    ;
 wire [ 1:0] es_ls_laddr   ;
 wire [ 3:0] es_ls_laddr_d ;
-wire        es_inst_mtlo  ;
-wire        es_inst_mthi  ;
-wire        es_inst_mflo  ;
-wire        es_inst_mfhi  ;
-wire        es_op_divu    ;
-wire        es_op_div     ;
-wire        es_op_multu   ;
-wire        es_op_mult    ;
+
+// lab8
+wire es_inst_mtc0;
+wire es_inst_mfc0;
+wire es_inst_sysc;
+wire es_inst_eret;
+wire es_inst_mtlo;
+wire es_inst_mthi;
+wire es_inst_mflo;
+wire es_inst_mfhi;
+wire es_op_divu  ;
+wire es_op_div   ;
+wire es_op_multu ;
+wire es_op_mult  ;
+
 wire [11:0] es_alu_op     ;
 wire        es_mem_re     ;
 wire        es_src1_is_sa ;
@@ -54,11 +64,15 @@ wire        es_src2_is_imm;
 wire        es_src2_is_8  ;
 wire        es_gr_we      ;
 wire        es_mem_we     ;
+wire        es_mem_we_r    ;
 wire [ 4:0] es_dest       ;
 wire [15:0] es_imm        ;
 wire [31:0] es_rs_value   ;
 wire [31:0] es_rt_value   ;
 wire [31:0] es_pc         ;
+
+wire es_flush;
+wire ds_flush;
 
 wire [31:0] es_alu_src1  ;
 wire [31:0] es_alu_src2  ;
@@ -109,19 +123,21 @@ wire [ 3:0] write_strb;
 wire [31:0] write_data;
 
 // lab8
-wire es_inst_mtc0;
-wire es_inst_mfc0;
-wire es_inst_sysc;
-wire es_inst_eret;
 wire [2:0] es_sel;
 wire [4:0] es_rd;
 
 wire es_bd; // if inst is in branch-delay-slot
+wire es_res_valid;
+wire es_div_ready;
 
+wire es_ex;
+
+reg es_pre_flush;
 
 /* ------------------------------ LOGIC ------------------------------ */
 
-assign {es_bd          ,  //162
+assign {ds_flush       ,  //163
+        es_bd          ,  //162
         es_inst_eret   ,  //161
         es_inst_sysc   ,  //160
         es_inst_mfc0   ,  //159
@@ -151,6 +167,7 @@ assign {es_bd          ,  //162
         es_rt_value    ,  //63 :32
         es_pc             //31 :0
        } = ds_to_es_bus_r;
+assign es_mem_we_r = es_mem_we & ~es_flush & ~es_pre_flush;
 
 // ls_laddr decoded one-hot
 assign es_ls_laddr      =  es_alu_result[1:0];
@@ -159,7 +176,13 @@ assign es_ls_laddr_d[2] = (es_ls_laddr==2'b10);
 assign es_ls_laddr_d[1] = (es_ls_laddr==2'b01);
 assign es_ls_laddr_d[0] = (es_ls_laddr==2'b00);
 
-assign es_to_ms_bus = {es_bd       ,  //123
+// lab8
+assign es_flush = exc_flush | ds_flush;
+assign es_ex = es_inst_eret
+             | es_inst_sysc;
+
+assign es_to_ms_bus = {es_flush    ,  //124
+                       es_bd       ,  //123
                        es_inst_eret,  //122
                        es_inst_sysc,  //121
                        es_inst_mfc0,  //120
@@ -175,27 +198,47 @@ assign es_to_ms_bus = {es_bd       ,  //123
                        es_res_r    , //63:32 originally es_alu_result
                        es_pc         //31:0
                       };
+
+assign es_res_valid = ~es_mem_re
+                    & ~es_inst_mfc0;
+
 assign es_to_ds_bus = {`ES_TO_DS_BUS_WD{ es_valid
-                                       & es_gr_we}} & {~es_mem_re, //37    es_res_valid
-                                                        es_dest,   //36:32 es_dest
-                                                        es_res_r   //31: 0 es_res_r
-                                                        };
+                                       & es_gr_we
+                                       }} & {es_res_valid, //37    es_res_valid
+                                             es_dest,      //36:32 es_dest
+                                             es_res_r      //31: 0 es_res_r
+                                             };
 // es_ready_go change from 1'b1
-assign es_ready_go    = es_hilo_we | (~|{es_op_div,  // wait div to end
-                                         es_op_divu
-                                         });
-assign es_allowin     = !es_valid || es_ready_go && ms_allowin;
+assign es_div_ready   =~(es_op_div
+                        |es_op_divu) | es_hilo_we;
+assign es_ready_go    = es_div_ready | es_flush;
+assign es_allowin     = !es_valid
+                      || es_ready_go && ms_allowin
+                      || es_flush;
 assign es_to_ms_valid =  es_valid && es_ready_go;
 always @(posedge clk) begin
     if (reset) begin
         es_valid <= 1'b0;
     end
     else if (es_allowin) begin
-        es_valid <= ds_to_es_valid & ~eret_flush;
+        es_valid <= ds_to_es_valid;
     end
 
     if (ds_to_es_valid && es_allowin) begin
         ds_to_es_bus_r <= ds_to_es_bus;
+    end
+end
+
+// lab8
+always @(posedge clk) begin
+    if (reset) begin
+        es_pre_flush <= 1'b0;
+    end
+    else if (es_ex & es_valid & ~es_flush ) begin
+        es_pre_flush <= 1'b1;
+    end
+    else if (es_flush) begin
+        es_pre_flush <= 1'b0;
     end
 end
 
@@ -283,10 +326,12 @@ end
 
 
 /* HI, LO R&W: begin */
-assign es_hilo_we = es_op_mult
-                  | es_op_multu
-                  | es_op_div  & es_div_out_valid
-                  | es_op_divu & es_divu_out_valid;
+assign es_hilo_we   = es_op_mult
+                    | es_op_multu
+                    | es_op_div  &  es_div_out_valid
+                    | es_op_divu &  es_divu_out_valid;
+assign es_hilo_we_r = es_hilo_we & ~es_flush & ~es_pre_flush; //lab8
+
 assign es_hi_res = {32{es_op_mult|es_op_multu}} & es_mult_result[63:32]
                  | {32{es_op_div             }} & es_div_dout[31:0]
                  | {32{es_op_divu            }} & es_divu_dout[31:0];
@@ -299,14 +344,14 @@ always @(posedge clk) begin
         hi <= 32'b0;
         lo <= 32'b0;
     end
-    else if (es_hilo_we) begin // mult/div
+    else if (es_hilo_we_r) begin // mult/div lab8
         hi <= es_hi_res;
         lo <= es_lo_res;
     end
-    else if (es_inst_mthi) begin // mthi
+    else if (es_inst_mthi & ~es_flush & ~es_pre_flush) begin // mthi
         hi <= es_rs_value;
     end
-    else if (es_inst_mtlo) begin // mtlo
+    else if (es_inst_mtlo & ~es_flush & ~es_pre_flush) begin // mtlo
         lo <= es_rs_value;
     end
 end
@@ -404,8 +449,8 @@ assign write_data = {32{es_ls_type[4]}} & write_data_swr // SWR
 /* Generate write_strb & write data: end */
 
 
-assign data_sram_en    = 1'b1;
-assign data_sram_wen   = es_mem_we & es_valid ? write_strb : 4'h0;
+assign data_sram_en    = ~es_pre_flush & ~es_flush; // lab8
+assign data_sram_wen   = es_mem_we_r & es_valid ? write_strb : 4'h0; //lab8
 assign data_sram_addr  = es_alu_result; // note: do not change because addr can only be an alu_result
 assign data_sram_wdata = write_data;
 

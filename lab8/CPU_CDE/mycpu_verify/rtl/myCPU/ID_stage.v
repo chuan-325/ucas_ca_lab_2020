@@ -19,7 +19,7 @@ module id_stage(
     //to fs
     output [`BR_BUS_WD       -1:0] br_bus        ,
     // lab8: flush
-    input         eret_flush,
+    input         exc_flush,
     //to rf: for write back
     input  [`WS_TO_RF_BUS_WD -1:0] ws_to_rf_bus
 );
@@ -35,11 +35,16 @@ reg  [`FS_TO_DS_BUS_WD -1:0] fs_to_ds_bus_r;
 wire [31:0] ds_inst;
 wire [31:0] ds_pc  ;
 
+wire ds_flush;
+wire fs_flush;
+
 wire        rf_we   ;
+wire        rf_we_r ;
 wire [ 4:0] rf_waddr;
 wire [31:0] rf_wdata;
 
 wire es_res_valid;
+wire ms_res_valid;
 
 wire [ 4:0] es_dest;
 wire [ 4:0] ms_dest;
@@ -178,6 +183,7 @@ wire rt_eq_ms_dest;
 wire rs_eq_ws_dest;
 wire rt_eq_ws_dest;
 wire st_eq_es_dest; //st(@es)
+wire st_eq_ms_dest; //st(@ms)
 
 // if current type (i.e. at decode stage) has any src from reg
 wire type_st;
@@ -189,6 +195,8 @@ wire type_nr;
 wire rs_eq_dests;
 wire rt_eq_dests;
 wire st_eq_dests;
+wire ds_no_crash_es;
+wire ds_no_crash_ms;
 
 // lab8
 wire inst_mtc0;
@@ -199,13 +207,19 @@ wire inst_sysc;
 wire [2:0] ds_sel;
 wire [7:0] in10_3;
 
-wire ds_bd; // if inst is in branch-delay-slot
+reg ds_bd; // lab8 if inst is in branch-delay-slot
+
+reg ds_sysc_yet; // lab8 this sysc not processed yet
+
+wire inst_branch;
+wire inst_jxr;
+wire inst_jnr;
 
 /* ------------------------------ LOGIC ------------------------------ */
 
 assign fs_pc = fs_to_ds_bus[31:0];
 
-assign {ds_bd  , //64
+assign {fs_flush,//64
         ds_inst, //63:32
         ds_pc    //31:0
         } = fs_to_ds_bus_r;
@@ -214,21 +228,29 @@ assign {rf_we   ,  //37:37
         rf_waddr,  //36:32
         rf_wdata   //31:0
        } = ws_to_rf_bus;
+assign rf_we_r = rf_we & ~ds_flush;
 
-assign es_res_valid = es_to_ds_bus[37];
+assign ws_dest = rf_waddr & {5{rf_we_r}};
 
-assign es_dest = es_to_ds_bus[36:32];
-assign ms_dest = ms_to_ds_bus[36:32];
-assign ws_dest = rf_waddr & {5{rf_we}};
-assign es_res  = es_to_ds_bus[31:0];
-assign ms_res  = ms_to_ds_bus[31:0];
+assign {es_res_valid, //37
+        es_dest     , //36:32
+        es_res        //31:0
+        } = es_to_ds_bus;
 
-assign br_bus       = {br_stall,    // 33
-                       br_taken,    // 32
-                       br_target    // 31:0
-                       };
+assign {ms_res_valid, //37
+        ms_dest     , //36:32
+        ms_res        //31:0
+        } = ms_to_ds_bus;
+
+assign br_bus = {br_stall  , // 33
+                 br_taken  , // 32
+                 br_target   // 31:0
+                 };
+
 // lab8 modified
-assign ds_to_es_bus = {ds_bd      ,  //162
+assign ds_flush = exc_flush | fs_flush;
+assign ds_to_es_bus = {ds_flush   ,  //163
+                       ds_bd      ,  //162
                        inst_eret  ,  //161
                        inst_sysc  ,  //160
                        inst_mfc0  ,  //159
@@ -284,6 +306,7 @@ assign rt_eq_es_dest = (rt_neq_0 & es_dest_neq_0) && (rt == es_dest); // rt
 assign rt_eq_ms_dest = (rt_neq_0 & ms_dest_neq_0) && (rt == ms_dest);
 assign rt_eq_ws_dest = (rt_neq_0 & ws_dest_neq_0) && (rt == ws_dest);
 assign st_eq_es_dest = rs_eq_es_dest | rt_eq_es_dest;                 // st(@es)
+assign st_eq_ms_dest = rs_eq_ms_dest | rt_eq_ms_dest;                 // st(@ms)
 
 // Type define for block situation
                             // src from rs & rt
@@ -336,31 +359,52 @@ assign st_eq_dests = rs_eq_dests   | rt_eq_dests   ;
 
 // signal generate in ds_ready_go
 // With Bypass Tech: only block when src_reg crash with a load inst(@es)
-assign ds_ready_go = es_res_valid
-                   | ~( rs_eq_es_dest & type_rs
-                      | rt_eq_es_dest & type_rt
-                      | st_eq_es_dest & type_st
-                      );
-// Without Bypass Tech
-/*
-assign ds_ready_go    =  type_st & ~st_eq_dests
-                      || type_rs & ~rs_eq_dests
-                      || type_rt & ~rt_eq_dests
-                      || type_nr ;
-*/
+assign ds_no_crash_es = ~(rs_eq_es_dest & type_rs
+                        | rt_eq_es_dest & type_rt
+                        | st_eq_es_dest & type_st
+                        );
+assign ds_no_crash_ms = ~(rs_eq_ms_dest & type_rs
+                        | rt_eq_ms_dest & type_rt
+                        | st_eq_ms_dest & type_st
+                        );
+assign ds_ready_go = (es_res_valid || ds_no_crash_es)
+                  && (ms_res_valid || ds_no_crash_ms)
+                  ||  ds_flush;
+
 /*---Need block? end---*/
 
-assign ds_allowin     = !ds_valid || ds_ready_go && es_allowin;
+assign ds_allowin     = !ds_valid
+                      || ds_ready_go && es_allowin
+                      || ds_flush;
 assign ds_to_es_valid =  ds_valid && ds_ready_go;
 always @(posedge clk) begin
     if (reset) begin
         ds_valid <= 1'b0;
     end
     else if (ds_allowin) begin
-        ds_valid <= fs_to_ds_valid & ~eret_flush;
+        ds_valid <= fs_to_ds_valid;
     end
     if (fs_to_ds_valid && ds_allowin) begin
         fs_to_ds_bus_r <= fs_to_ds_bus;
+    end
+end
+
+// lab8
+always @(posedge clk) begin
+    if(reset) begin
+        ds_sysc_yet <= 1'b0;
+    end
+    else begin
+        ds_sysc_yet <= inst_sysc;
+    end
+end
+
+always @(posedge clk) begin
+    if(reset) begin
+        ds_bd <= 1'b0;
+    end
+    else begin
+        ds_bd <= inst_branch | inst_jxr | inst_jnr;
     end
 end
 
@@ -450,8 +494,9 @@ assign inst_mtlo   = op_d[6'h00] & func_d[6'h13] & sa_d[5'h00] & rd_d[5'h00] & r
 // lab8 new
 assign inst_mtc0 = op_d[6'h10] & rs_d[5'h04] & sa_d[5'h00] & ~|func[5:3];
 assign inst_mfc0 = op_d[6'h10] & rs_d[5'h00] & sa_d[5'h00] & ~|func[5:3];
-assign inst_eret = op_d[6'h10] & rs_d[5'h10] & rt_d[5'h00] & rd_d[5'h00] & sa_d[5'h00] & func_d[6'h18];
-assign inst_sysc = op_d[6'h00] & func_d[6'h0b];
+assign inst_eret = op_d[6'h10] & rs_d[5'h10] & rt_d[5'h00] & rd_d[5'h00]
+                 & sa_d[5'h00] & func_d[6'h18];
+assign inst_sysc = op_d[6'h00] & func_d[6'h0c];
 
 assign alu_op[ 0] = |{inst_addu, inst_addiu, inst_add, inst_addi,
                       inst_lw, inst_lwl, inst_lwr,
@@ -533,7 +578,7 @@ regfile u_regfile(
     .rdata1 (rf_rdata1),
     .raddr2 (rf_raddr2),
     .rdata2 (rf_rdata2),
-    .we     (rf_we    ),
+    .we     (rf_we_r  ),
     .waddr  (rf_waddr ),
     .wdata  (rf_wdata )
     );
@@ -555,8 +600,8 @@ assign rs_se_0  =  rs_value[31] | (~|rs_value);
 assign rs_st_0  =  rs_value[31] ;
 
 // br info
-assign br_stall = 1'b0; //(inst_beq || inst_bne ) & st_eq_dests;
-assign br_taken = ( inst_beq    &  rs_eq_rt
+assign br_stall   = 1'b0; //(inst_beq || inst_bne ) & st_eq_dests;
+assign br_taken   =(inst_beq    &  rs_eq_rt
                   | inst_bne    & ~rs_eq_rt
                   | inst_bgez   &  rs_be_0
                   | inst_bgtz   &  rs_bt_0
@@ -568,12 +613,9 @@ assign br_taken = ( inst_beq    &  rs_eq_rt
                   | inst_jalr
                   | inst_j
                   | inst_jr
-                  | inst_sysc // lab8
-                  ) && ds_valid;
+                  ) && ds_valid & ~ds_flush; //lab8
 
 // lab8
-wire inst_branch;
-wire inst_jxr;
 assign inst_branch = inst_beq
                    | inst_bne
                    | inst_bgez
@@ -584,9 +626,10 @@ assign inst_branch = inst_beq
                    | inst_bgezal;
 assign inst_jxr    = inst_jr
                    | inst_jalr;
+assign inst_jnr    = inst_j
+                   | inst_jal;
 assign br_target   = {32{inst_branch}} & (fs_pc + {{14{imm[15]}}, imm[15:0], 2'b0})
                    | {32{inst_jxr}}    &  rs_value
-                   | {32{inst_jal}}    & {fs_pc[31:28], jidx[25:0], 2'b0}
-                   | {32{inst_sysc}}   &  32'hbfc00380;
+                   | {32{inst_jnr}}    & {fs_pc[31:28], jidx[25:0], 2'b0};
 
 endmodule

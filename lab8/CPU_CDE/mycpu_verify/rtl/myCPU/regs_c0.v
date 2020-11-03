@@ -34,7 +34,7 @@ assign c0_status_bev = 1'b1;
 
 // IM(7~0): R&W
 wire mtc0_we;
-assign mtc0_we = wb_valid && op_mtc0 && wb_ex;
+assign mtc0_we = wb_valid && op_mtc0 && !wb_ex;
 reg [7:0] c0_status_im;
 always @(posedge clk) begin
     if(mtc0_we && c0_addr == `CR_STATUS) begin
@@ -138,7 +138,7 @@ always @(posedge clk) begin
     if (rst) begin
         c0_cause_excode <= 5'b0;
     end
-    else begin
+    else if (wb_ex) begin
         c0_cause_excode <= wb_excode;
     end
 end
@@ -168,10 +168,15 @@ end
 
 
 /* read selection & assignment: begin*/
-assign c0_rdata = {32{c0_addr ==`CR_STATUS}} & c0_status
-                | {32{c0_addr ==`CR_CAUSE}}  & c0_cause
-                | {32{(c0_addr ==`CR_EPC)
-                     | eret_flush}}          & c0_epc;
+wire read_c0_status;
+wire read_c0_cause;
+wire read_c0_epc;
+assign read_c0_status = (c0_addr ==`CR_STATUS);
+assign read_c0_cause  = (c0_addr ==`CR_CAUSE );
+assign read_c0_epc    = (c0_addr ==`CR_EPC   ) || eret_flush;
+assign c0_rdata = {32{read_c0_status}} & c0_status
+                | {32{read_c0_cause}}  & c0_cause
+                | {32{read_c0_epc}}    & c0_epc;
 
 /* read selection & assignment: end*/
 

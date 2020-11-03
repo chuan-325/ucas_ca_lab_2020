@@ -11,8 +11,8 @@ module if_stage(
     output                         fs_to_ds_valid ,
     output [`FS_TO_DS_BUS_WD -1:0] fs_to_ds_bus   ,
     // lab8: flush
-    input  [31:0] pc_fr_epc,
-    input         eret_flush,
+    input  [31:0] ws_pc_gen_exc,
+    input         exc_flush,
     // inst sram interface
     output        inst_sram_en   ,
     output [ 3:0] inst_sram_wen  ,
@@ -39,7 +39,7 @@ wire [ 31:0] br_target;
 wire [31:0] fs_inst;
 reg  [31:0] fs_pc;
 
-wire fs_bd; // if inst is in branch-delay-slot
+wire fs_flush;
 
 /* ------------------------------ LOGIC ------------------------------ */
 
@@ -48,7 +48,10 @@ assign {br_stall,
         br_target
        } = br_bus;
 
-assign fs_to_ds_bus = {fs_bd   ,  //64
+// lab8
+assign fs_flush = exc_flush;
+
+assign fs_to_ds_bus = {fs_flush,  //64
                        fs_inst ,  //63:32
                        fs_pc   }; //31: 0
 
@@ -56,13 +59,15 @@ assign fs_to_ds_bus = {fs_bd   ,  //64
 assign to_fs_ready_go = ~br_stall;
 assign to_fs_valid    = ~reset & to_fs_ready_go; // edited later in axi
 assign seq_pc         = fs_pc + 3'h4;
-assign nextpc         = eret_flush ? pc_fr_epc
-                      : br_taken   ? br_target
-                                   : seq_pc;
+assign nextpc         = fs_flush  ? ws_pc_gen_exc
+                      : br_taken  ? br_target
+                                  : seq_pc;
 
 // IF stage
 assign fs_ready_go    = 1'b1;
-assign fs_allowin     = !fs_valid || fs_ready_go && ds_allowin;
+assign fs_allowin     = !fs_valid
+                      || fs_ready_go && ds_allowin
+                      || fs_flush; //lab8
 assign fs_to_ds_valid =  fs_valid && fs_ready_go;
 always @(posedge clk) begin
     if (reset) begin

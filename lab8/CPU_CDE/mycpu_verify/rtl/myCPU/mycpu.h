@@ -4,13 +4,13 @@
     `define BR_BUS_WD 35
 
     `define FS_TO_DS_BUS_WD 65
-    `define DS_TO_ES_BUS_WD 163 //150
-    `define ES_TO_MS_BUS_WD 124 //111
-    `define MS_TO_WS_BUS_WD 83 //70
+    `define DS_TO_ES_BUS_WD 164 //150
+    `define ES_TO_MS_BUS_WD 125 //111
+    `define MS_TO_WS_BUS_WD 84 //70
 
     `define WS_TO_RF_BUS_WD 38
     `define ES_TO_DS_BUS_WD 38
-    `define MS_TO_DS_BUS_WD 37
+    `define MS_TO_DS_BUS_WD 38
 
     // CRs
     `define CR_COMPARE 8'h0b // 000, 01011
