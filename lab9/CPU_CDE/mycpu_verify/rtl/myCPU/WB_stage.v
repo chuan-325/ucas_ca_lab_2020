@@ -84,7 +84,7 @@ assign {ws_exc_of      , //121
         ms_flush       , //83
         ws_bd          , //82
         ws_inst_eret   , //81
-        ws_exc_sysc   , //80
+        ws_exc_sysc    , //80
         ws_inst_mfc0   , //79
         ws_inst_mtc0   , //78
         ws_sel         , //77:75

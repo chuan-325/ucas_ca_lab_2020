@@ -38,7 +38,7 @@ reg  [`DS_TO_ES_BUS_WD -1:0] ds_to_es_bus_r;
 
 wire es_inst_mtc0;
 wire es_inst_mfc0;
-wire es_exc_sysc;
+wire es_exc_sysc ;
 wire es_inst_eret;
 wire es_inst_mtlo;
 wire es_inst_mthi;
@@ -65,7 +65,7 @@ wire        es_src1_is_sa ;
 wire        es_src1_is_pc ;
 wire        es_src2_is_imm;
 wire        es_src2_is_8  ;
-wire        es_gpr_we      ;
+wire        es_gpr_we     ;
 wire        es_mem_we     ;
 wire        es_mem_we_r   ;
 wire [ 4:0] es_dest       ;
@@ -206,7 +206,7 @@ assign es_ex    = es_inst_eret
                 | es_exc_adel_ld
                 | es_exc_ades;
 
-assign es_to_ms_bus = {es_exc_of         , //162
+assign es_to_ms_bus = {es_exc_of     , //162
                        es_badvaddr   , //161:130
                        es_exc_ades   , //129
                        es_exc_adel_ld, //128
@@ -216,7 +216,7 @@ assign es_to_ms_bus = {es_exc_of         , //162
                        es_flush      , //124
                        es_bd         , //123
                        es_inst_eret  , //122
-                       es_exc_sysc  , //121
+                       es_exc_sysc   , //121
                        es_inst_mfc0  , //120
                        es_inst_mtc0  , //119
                        es_sel        , //118:116
@@ -228,7 +228,7 @@ assign es_to_ms_bus = {es_exc_of         , //162
                        es_gpr_we     , //69:69
                        es_dest       , //68:64
                        es_res_r      , //63:32 originally es_alu_result
-                       es_pc         //31:0
+                       es_pc          //31:0
                       };
 
 assign es_res_valid = ~es_mem_re
