@@ -13,17 +13,22 @@ module regs_c0(
     input  [ 2:0] wb_sel,
     input  [31:0] c0_wdata,
     output [31:0] c0_rdata,
+    output has_int,
     input  wb_bd,//if br delay slot
     input  [ 5:0] ext_int_in,
     input  [ 4:0] wb_excode,
     input  [31:0] wb_pc,
-    // not used yet (lab9)
     input  [31:0] wb_badvaddr // badvaddr
 );
 
 // pre
 wire [7:0] c0_addr;
 assign c0_addr = {wb_sel, wb_rd}; // sel+rd decide cpr's address
+// declarations
+reg [31:0] c0_badvaddr;
+reg [31:0] c0_compare;
+reg        tick;
+reg [31:0] c0_count;
 
 /*
  * Status
@@ -90,23 +95,23 @@ always@(posedge clk) begin
     if (rst) begin
         c0_cause_bd <= 1'b0;
     end
-    else if (mtc0_we && !c0_status_exl ) begin
+    else if (wb_ex && !c0_status_exl) begin
         c0_cause_bd <= wb_bd;
     end
 end
 
 // TI
 reg c0_cause_ti;
-wire count_eq_compare; //! PIT
-assign count_eq_compare = 1'b0;//! PIT
+wire count_eq_compare;
+assign count_eq_compare = (c0_count == c0_compare);
 always@(posedge clk) begin
     if (rst) begin
         c0_cause_ti <= 1'b0;
     end
-    else if (mtc0_we && c0_addr == `CR_CAUSE) begin
+    else if (mtc0_we && c0_addr == `CR_COMPARE) begin
         c0_cause_ti <= 1'b0;
     end
-    else if (count_eq_compare) begin //! PIT
+    else if (count_eq_compare) begin
         c0_cause_ti <= 1'b1;
     end
 end
@@ -128,7 +133,7 @@ always @(posedge clk) begin
     if (rst) begin
         c0_cause_ip[1:0] <= 2'b0;
     end
-    else begin
+    else if (mtc0_we && c0_addr==`CR_CAUSE) begin
         c0_cause_ip[1:0] <= c0_wdata[9:8];
     end
 end
@@ -171,30 +176,44 @@ end
 
 
 /* read selection & assignment: begin*/
-wire read_c0_status;
-wire read_c0_cause;
-wire read_c0_epc;
-assign read_c0_status = (c0_addr ==`CR_STATUS);
-assign read_c0_cause  = (c0_addr ==`CR_CAUSE );
-assign read_c0_epc    = (c0_addr ==`CR_EPC   ) || eret_flush;
-assign c0_rdata = {32{read_c0_status}} & c0_status
-                | {32{read_c0_cause}}  & c0_cause
-                | {32{read_c0_epc}}    & c0_epc;
+wire addr_eq_status;
+wire addr_eq_cause;
+wire addr_eq_epc;
+wire addr_eq_count;
+wire addr_eq_compare;
+wire addr_eq_badvaddr;
+
+assign addr_eq_status   = (c0_addr == `CR_STATUS   );
+assign addr_eq_cause    = (c0_addr == `CR_CAUSE    );
+assign addr_eq_epc      = (c0_addr == `CR_EPC      );
+assign addr_eq_count    = (c0_addr == `CR_COUNT    );
+assign addr_eq_compare  = (c0_addr == `CR_COMPARE  );
+assign addr_eq_badvaddr = (c0_addr == `CR_BADVADDR );
+
+assign c0_rdata = {32{addr_eq_status}}         & c0_status
+                | {32{addr_eq_cause}}          & c0_cause
+                | {32{addr_eq_epc|eret_flush}} & c0_epc
+                | {32{addr_eq_count}}          & c0_count
+                | {32{addr_eq_compare}}        & c0_compare
+                | {32{addr_eq_badvaddr}}       & c0_badvaddr;
 
 /* read selection & assignment: end*/
 
-/* -----------------lab 9 below------------------ */
+/* -----------------lab9 below------------------ */
+
+assign has_int = (|(c0_cause_ip & c0_status_im))
+                  & c0_status_ie
+                  & ~c0_status_exl;
 
 /*
  * BadVAddr
  */
 
-reg [31:0] c0_badvaddr;
 always @(posedge clk) begin
     if (rst) begin
         c0_badvaddr <= 32'b0;
     end
-    else if (wb_ex && wb_excode == `EX_ADEL) begin
+    else if (wb_ex && (wb_excode == `EX_ADEL || wb_excode == `EX_ADES)) begin
         c0_badvaddr <= wb_badvaddr;
     end
 end
@@ -204,8 +223,6 @@ end
  * Count
  */
 
-reg        tick;
-reg [31:0] c0_count;
 always @(posedge clk) begin
     if (rst) begin
         tick <= 1'b0;
@@ -213,7 +230,9 @@ always @(posedge clk) begin
     else begin
         tick <= ~tick;
     end
+end
 
+always @(posedge clk) begin
     if (rst) begin
         c0_count <= 32'b0;
     end
@@ -228,12 +247,11 @@ end
 /*
  * Compare
  */
-reg [31:0] c0_compare;
 always @(posedge clk) begin
     if (rst) begin
         c0_compare <= 32'b0;
     end
-    else if (mtc0_we && `CR_COMPARE) begin
+    else if (mtc0_we && c0_addr == `CR_COMPARE) begin
         c0_compare <= c0_wdata;
     end
 end

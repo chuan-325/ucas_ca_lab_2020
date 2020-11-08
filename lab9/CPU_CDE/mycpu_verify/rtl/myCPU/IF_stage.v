@@ -38,6 +38,8 @@ wire [31:0] br_target;
 
 wire [31:0] fs_inst;
 reg  [31:0] fs_pc;
+wire [31:0] fs_badvaddr;
+wire        fs_exc_adel_if;
 
 wire        fs_flush;
 
@@ -48,19 +50,23 @@ assign {br_stall,
         br_target
        } = br_bus;
 
-assign fs_to_ds_bus = {fs_flush,  //64
-                       fs_inst ,  //63:32
-                       fs_pc   }; //31: 0
+assign fs_badvaddr  = {32{fs_exc_adel_if}} & fs_pc;
+assign fs_to_ds_bus = {fs_badvaddr   ,  //97:66
+                       fs_exc_adel_if,  //65
+                       fs_flush      ,  //64
+                       fs_inst       ,  //63:32
+                       fs_pc        };  //31: 0
 
 assign fs_flush = exc_flush;
+assign fs_exc_adel_if = |fs_pc[1:0]; //lab8
 
 // pre-IF stage
 assign to_fs_ready_go = ~br_stall;
 assign to_fs_valid    = ~reset & to_fs_ready_go; // edited later in axi
 assign seq_pc         = fs_pc + 3'h4;
-assign nextpc         = fs_flush  ? ws_pc_gen_exc
-                      : br_taken  ? br_target
-                                  : seq_pc;
+assign nextpc         = fs_flush ? ws_pc_gen_exc
+                      : br_taken ? br_target
+                                 : seq_pc;
 
 // IF stage
 assign fs_ready_go    = 1'b1;

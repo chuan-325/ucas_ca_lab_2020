@@ -2,7 +2,8 @@ module alu(
   input  [11:0] alu_op,
   input  [31:0] alu_src1,
   input  [31:0] alu_src2,
-  output [31:0] alu_result
+  output [31:0] alu_result,
+  output        alu_of //overflow
 );
 
 wire op_add;   // ADD
@@ -72,7 +73,7 @@ assign sltu_result[0]    = ~adder_cout;
 
 // bitwise operation
 assign and_result = alu_src1 & alu_src2;
-assign or_result  = alu_src1 | alu_src2; //edit 5
+assign or_result  = alu_src1 | alu_src2;
 assign nor_result = ~or_result;
 assign xor_result = alu_src1 ^ alu_src2;
 assign lui_result = {alu_src2[15:0], 16'b0};
@@ -83,7 +84,7 @@ assign sll_result = alu_src2 << alu_src1[4:0];
 // SRL, SRA result
 assign sr64_result = {{32{op_sra & alu_src2[31]}}, alu_src2[31:0]} >> alu_src1[4:0];
 
-assign sr_result   = sr64_result[31:0]; //edit 6
+assign sr_result   = sr64_result[31:0];
 
 // final result mux
 assign alu_result = ({32{op_add|op_sub}} & add_sub_result)
@@ -96,5 +97,11 @@ assign alu_result = ({32{op_add|op_sub}} & add_sub_result)
                   | ({32{op_lui       }} & lui_result    )
                   | ({32{op_sll       }} & sll_result    )
                   | ({32{op_srl|op_sra}} & sr_result     );
+
+//lab9
+assign alu_of = op_add & ( alu_src1[31] &  alu_src2[31] & ~add_sub_result[31]
+                         |~alu_src1[31] & ~alu_src2[31] &  add_sub_result[31])
+              | op_sub & ( alu_src1[31] & ~alu_src2[31] & ~add_sub_result[31]
+                         |~alu_src1[31] &  alu_src2[31] &  add_sub_result[31]);
 
 endmodule

@@ -3,10 +3,14 @@
 
     `define BR_BUS_WD 35
 
-    `define FS_TO_DS_BUS_WD 65
-    `define DS_TO_ES_BUS_WD 164 //150
-    `define ES_TO_MS_BUS_WD 125 //111
-    `define MS_TO_WS_BUS_WD 84 //70
+    //65->66
+    `define FS_TO_DS_BUS_WD 98
+    //164->168
+    `define DS_TO_ES_BUS_WD 200
+    //125->161
+    `define ES_TO_MS_BUS_WD 163
+    //84->121
+    `define MS_TO_WS_BUS_WD 122
 
     `define WS_TO_RF_BUS_WD 38
     `define ES_TO_DS_BUS_WD 38
@@ -18,6 +22,8 @@
     `define CR_CAUSE 8'h0d // 000, 01101
     `define CR_EPC 8'h0e // 000, 01110
     `define CR_COUNT 8'h09 // 000, 01001
+    `define CR_BADVADDR 8'h08 // 000,01000
+
     // EXcode
     `define EX_INTR 5'h00
     `define EX_ADEL 5'h04 // fetch_inst/read_data

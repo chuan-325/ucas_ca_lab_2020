@@ -31,13 +31,19 @@ wire [31:0] ms_rt_value;
 wire [ 1:0] ms_ls_laddr;
 wire [ 5:0] ms_ls_type;
 wire        ms_mem_re;
-wire        ms_gr_we;
+wire        ms_gpr_we;
 wire [ 4:0] ms_dest;
 wire [31:0] ms_alu_result;
 wire [31:0] ms_pc;
 
+wire [31:0] ms_badvaddr;
+
 wire        ms_flush;
 wire        es_flush;
+
+wire ms_res_valid;
+wire ms_bd;
+wire ms_if_privil;
 
 wire [ 2:0] ms_sel;
 wire [ 4:0] ms_rd;
@@ -54,7 +60,7 @@ wire [31:0] ms_final_result;
 wire ms_inst_mtc0;
 wire ms_inst_mfc0;
 wire ms_inst_eret;
-wire ms_inst_sysc;
+wire ms_exc_sysc;
 wire ms_type_lwr;
 wire ms_type_lwl;
 wire ms_type_lhu;
@@ -63,24 +69,34 @@ wire ms_type_lbu;
 wire ms_type_lb;
 wire ms_type_lw;
 
+//lab9 newly added
+wire ms_exc_ri;
+wire ms_exc_bp;
+//lab9
+wire ms_exc_adel_if;
+wire ms_exc_adel_ld;
+wire ms_exc_ades;
+wire ms_exc_of;
+
 // prepare mem_res selection
 wire [31:0] mem_res_lwr;
 wire [31:0] mem_res_lwl;
 wire [31:0] mem_res_lhg;
 wire [31:0] mem_res_lbg;
 
-wire ms_if_privil;
-
-wire ms_bd; // if inst is in branch-delay-slot
-
-wire ms_res_valid;
-
 /* ------------------------------ LOGIC ------------------------------ */
 
-assign {es_flush       , //123
+assign {ms_exc_of          , //162
+        ms_badvaddr    , //161:130
+        ms_exc_ades    , //129
+        ms_exc_adel_ld , //128
+        ms_exc_adel_if , //127
+        ms_exc_ri      , //126
+        ms_exc_bp      , //125
+        es_flush       , //124
         ms_bd          , //123
         ms_inst_eret   , //122
-        ms_inst_sysc   , //121
+        ms_exc_sysc   , //121
         ms_inst_mfc0   , //120
         ms_inst_mtc0   , //119
         ms_sel         , //118:116
@@ -89,7 +105,7 @@ assign {es_flush       , //123
         ms_ls_laddr    , //78:77
         ms_ls_type     , //76:71
         ms_mem_re      , //70:70
-        ms_gr_we       , //69:69
+        ms_gpr_we       , //69:69
         ms_dest        , //68:64
         ms_alu_result  , //63:32
         ms_pc            //31:0
@@ -102,23 +118,30 @@ assign ms_ls_laddr_d[1] = (ms_ls_laddr==2'b01);
 assign ms_ls_laddr_d[0] = (ms_ls_laddr==2'b00);
 
 assign ms_flush = exc_flush | es_flush;
-assign ms_to_ws_bus = {ms_flush       ,  //83
-                       ms_bd          ,  //82
-                       ms_inst_eret   ,  //81
-                       ms_inst_sysc   ,  //80
-                       ms_inst_mfc0   ,  //79
-                       ms_inst_mtc0   ,  //78
-                       ms_sel         ,  //77:75
-                       ms_rd          ,  //74:70
-                       ms_gr_we       ,  //69:69
-                       ms_dest        ,  //68:64
-                       ms_final_result,  //63:32
-                       ms_pc             //31:0
+assign ms_to_ws_bus = {ms_exc_of          , //121
+                       ms_badvaddr    , //120:89
+                       ms_exc_ades    , //88
+                       ms_exc_adel_if , //87
+                       ms_exc_adel_ld , //86
+                       ms_exc_ri      , //85
+                       ms_exc_bp      , //84
+                       ms_flush       , //83
+                       ms_bd          , //82
+                       ms_inst_eret   , //81
+                       ms_exc_sysc    , //80
+                       ms_inst_mfc0   , //79
+                       ms_inst_mtc0   , //78
+                       ms_sel         , //77:75
+                       ms_rd          , //74:70
+                       ms_gpr_we      , //69:69
+                       ms_dest        , //68:64
+                       ms_final_result, //63:32
+                       ms_pc            //31:0
                       };
 assign ms_res_valid = ~ms_inst_mfc0;
 
 assign ms_to_ds_bus = {`MS_TO_DS_BUS_WD{ ms_valid
-                                       & ms_gr_we
+                                       & ms_gpr_we
                                        }} & {ms_res_valid,    // 37
                                              ms_dest,         // 36:32 ms_dest
                                              ms_final_result  // 31: 0 ms_res

@@ -35,6 +35,8 @@ reg  [`FS_TO_DS_BUS_WD -1:0] fs_to_ds_bus_r;
 wire [31:0] ds_inst;
 wire [31:0] ds_pc  ;
 
+wire [31:0] ds_badvaddr;
+
 wire ds_flush;
 wire fs_flush;
 
@@ -53,7 +55,7 @@ wire        src1_is_pc;
 wire        src2_is_imm;
 wire        src2_is_8;
 wire        mem_re;
-wire        gr_we;
+wire        gpr_we;
 wire        mem_we;
 wire [ 4:0] dest;
 wire [15:0] imm;
@@ -199,12 +201,15 @@ wire inst_mfc0;
 wire inst_eret;
 wire inst_sysc;
 
+wire exc_bp;// lab9 added
+wire exc_ri;
+wire ds_of_valid;
+wire exc_adel_if;
+
 wire [2:0] ds_sel;
 wire [7:0] in10_3;
 
 reg ds_bd; // if inst is in branch-delay-slot
-
-reg ds_sysc_yet; //? this sysc not processed yet
 
 wire inst_branch;
 wire inst_jxr;
@@ -214,9 +219,11 @@ wire inst_jnr;
 
 assign fs_pc = fs_to_ds_bus[31:0];
 
-assign {fs_flush,//64
-        ds_inst, //63:32
-        ds_pc    //31:0
+assign {ds_badvaddr , //97:66
+        exc_adel_if , //65
+        fs_flush    , //64
+        ds_inst     , //63:32
+        ds_pc         //31:0
         } = fs_to_ds_bus_r;
 
 assign {rf_we   , //37:37
@@ -242,7 +249,12 @@ assign br_bus = {br_stall , // 33
                  };
 
 assign ds_flush = exc_flush | fs_flush;
-assign ds_to_es_bus = {ds_flush   ,  //163
+assign ds_to_es_bus = {ds_of_valid,  //199 lab9 b
+                       ds_badvaddr,  //198:167
+                       exc_adel_if,  //166
+                       exc_ri     ,  //165
+                       exc_bp     ,  //164 lab9 e
+                       ds_flush   ,  //163
                        ds_bd      ,  //162
                        inst_eret  ,  //161
                        inst_sysc  ,  //160
@@ -265,7 +277,7 @@ assign ds_to_es_bus = {ds_flush   ,  //163
                        src1_is_pc ,  //121:121
                        src2_is_imm,  //120:120
                        src2_is_8  ,  //119:119
-                       gr_we      ,  //118:118  | we
+                       gpr_we     ,  //118:118  | we
                        mem_we     ,  //117:117
                        dest       ,  //116:112  | val
                        imm        ,  //111:96
@@ -298,22 +310,13 @@ always @(posedge clk) begin
         fs_to_ds_bus_r <= fs_to_ds_bus;
     end
 end
-//?not used
-always @(posedge clk) begin
-    if(reset) begin
-        ds_sysc_yet <= 1'b0;
-    end
-    else begin
-        ds_sysc_yet <= inst_sysc;
-    end
-end
 
 always @(posedge clk) begin
     if(reset) begin
         ds_bd <= 1'b0;
     end
-    else begin
-        ds_bd <= (inst_branch | inst_jxr | inst_jnr) & ds_valid;
+    else if (ds_valid) begin
+        ds_bd <= (inst_branch | inst_jxr | inst_jnr) & ~ds_flush;
     end
 end
 
@@ -406,6 +409,23 @@ assign inst_mfc0   = op_d[6'h10] & rs_d[5'h00] & sa_d[5'h00] & ~|func[5:3];
 assign inst_eret   = op_d[6'h10] & rs_d[5'h10] & rt_d[5'h00] & rd_d[5'h00]
                    & sa_d[5'h00] & func_d[6'h18];
 assign inst_sysc   = op_d[6'h00] & func_d[6'h0c];
+//lab9
+assign exc_bp      = op_d[6'h00] & func_d[6'h0d];
+assign exc_ri      = ~|{inst_and , inst_andi , inst_or  , inst_ori  , inst_xor  , inst_xori, inst_nor,
+                        inst_addu, inst_addiu, inst_add , inst_addi , inst_subu , inst_sub ,
+                        inst_sll , inst_srl  , inst_sra , inst_sllv , inst_srav , inst_srlv,
+                        inst_slt , inst_sltu , inst_slti, inst_sltiu,
+                        inst_lui ,
+                        inst_mult, inst_multu, inst_div , inst_divu ,
+                        inst_mfhi, inst_mflo , inst_mthi, inst_mtlo ,
+                        inst_lw  , inst_lb   , inst_lbu  , inst_lh   , inst_lhu , inst_lwl  , inst_lwr,
+                        inst_sw  , inst_sb   , inst_sh  , inst_swl  , inst_swr  ,
+                        inst_beq , inst_bne  , inst_bgez, inst_bgtz , inst_blez , inst_bltz ,
+                        inst_bltzal, inst_bgezal,
+                        inst_jalr ,inst_jal  , inst_jr   , inst_j   ,
+                        inst_mtc0, inst_mfc0 , inst_eret, inst_sysc , exc_bp
+                       }; // except: tlbp, tlbr, tlbwi, cache
+assign ds_of_valid = inst_add | inst_addi | inst_sub;
 
 //alu_op
 assign alu_op[ 0] = |{inst_addu, inst_addiu, inst_add, inst_addi,
@@ -413,7 +433,8 @@ assign alu_op[ 0] = |{inst_addu, inst_addiu, inst_add, inst_addi,
                       inst_lb, inst_lbu, inst_lh, inst_lhu,
                       inst_sw, inst_sb, inst_sh, inst_swl, inst_swr,
                       inst_bgezal, inst_bltzal,
-                      inst_jal, inst_jalr};
+                      inst_jal, inst_jalr
+                     };
 assign alu_op[ 1] = inst_subu | inst_sub  ;
 assign alu_op[ 2] = inst_slt  | inst_slti ;
 assign alu_op[ 3] = inst_sltu | inst_sltiu;
@@ -455,7 +476,7 @@ assign dst_is_rt   = |{inst_addiu, inst_addi, inst_slti, inst_sltiu,
                        inst_lwl, inst_lwr,
                        inst_mfc0
                       };
-assign gr_we       = ~|{inst_sw, inst_sb, inst_sh, inst_swl, inst_swr,
+assign gpr_we      = ~|{inst_sw, inst_sb, inst_sh, inst_swl, inst_swr,
                         inst_beq, inst_bne, inst_bgez, inst_bgtz, inst_blez, inst_bltz,
                         inst_jr, inst_j,
                         inst_mult, inst_multu,
