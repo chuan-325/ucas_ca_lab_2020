@@ -37,7 +37,10 @@ wire mtc0_we;
 assign mtc0_we = wb_valid && op_mtc0 && !wb_ex;
 reg [7:0] c0_status_im;
 always @(posedge clk) begin
-    if(mtc0_we && c0_addr == `CR_STATUS) begin
+    if (rst) begin
+        c0_status_im <= 8'b0;
+    end
+    else if (mtc0_we && c0_addr == `CR_STATUS) begin
         c0_status_im <= c0_wdata[15:8];
     end
 end
