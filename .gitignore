@@ -17,5 +17,11 @@ lab8/CPU_CDE/soft
 lab8/CPU_CDE/Readme_First.txt
 # lab 9
 lab9/CPU_CDE/cpu132_gettrace
+lab9/CPU_CDE/.vscode
 lab9/CPU_CDE/soft
 lab9/CPU_CDE/Readme_First.txt
+# lab 10
+lab10/CPU_CDE_SRAM/cpu132_gettrace
+lab10/CPU_CDE_SRAM/.vscode
+lab10/CPU_CDE_SRAM/soft
+lab10/CPU_CDE_SRAM/Readme_First.txt

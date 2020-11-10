@@ -49,8 +49,8 @@ wire es_op_div   ;
 wire es_op_multu ;
 wire es_op_mult  ;
 //lab9
-wire es_exc_bp  ;
-wire es_exc_ri ;
+wire es_exc_bp   ;
+wire es_exc_ri   ;
 //lab9
 wire es_of_valid ;
 wire es_exc_of   ;
@@ -143,7 +143,7 @@ wire [3:0] es_ls_laddr_d;
 
 /* ------------------------------ LOGIC ------------------------------ */
 
-assign {es_of_valid    ,  //199 lab9 b
+assign {es_of_valid    ,  //199 lab9
         ds_badvaddr    ,  //198:167
         es_exc_adel_if ,  //166
         es_exc_ri      ,  //165

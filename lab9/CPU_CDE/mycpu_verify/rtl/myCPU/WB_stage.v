@@ -127,7 +127,7 @@ assign rf_we    = ws_gpr_we_r && ws_valid;
 assign rf_waddr = {5{ws_valid}} & ws_dest;
 assign rf_wdata = {32{~ws_if_privil}} & ws_final_result
                 | {32{ ws_if_privil}} & ws_privil_res;
-
+// lab9 modified
 assign ws_cp0_valid = ws_valid & ~ws_flush;
 assign ws_ex =( ws_exc_intr
               | ws_exc_sysc

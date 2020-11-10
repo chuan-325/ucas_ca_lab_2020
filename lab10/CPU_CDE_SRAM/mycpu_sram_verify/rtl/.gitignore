@@ -1,0 +1,5 @@
+BRIDGE/
+CONFREG/
+ram_wrap/
+xilinx_ip/
+soc_sram_lite_top.v
