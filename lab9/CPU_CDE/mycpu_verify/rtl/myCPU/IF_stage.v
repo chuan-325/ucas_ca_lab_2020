@@ -58,7 +58,7 @@ assign fs_to_ds_bus = {fs_badvaddr   ,  //97:66
                        fs_pc        };  //31: 0
 
 assign fs_flush = exc_flush;
-assign fs_exc_adel_if = |fs_pc[1:0]; //lab8
+assign fs_exc_adel_if = |fs_pc[1:0];
 
 // pre-IF stage
 assign to_fs_ready_go = ~br_stall;
