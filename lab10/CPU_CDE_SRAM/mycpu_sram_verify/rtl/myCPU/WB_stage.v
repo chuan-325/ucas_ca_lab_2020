@@ -28,7 +28,7 @@ wire        ws_ready_go;
 reg [`MS_TO_WS_BUS_WD -1:0] ms_to_ws_bus_r;
 
 wire        ws_gpr_we;
-wire        ws_gpr_we_r;
+wire        ws_gpr_we_t;
 wire [ 4:0] ws_dest;
 wire [31:0] ws_final_result;
 wire [31:0] ws_pc;
@@ -88,7 +88,7 @@ assign {ws_exc_of      , //121
         ws_pc            //31:0
        } = ms_to_ws_bus_r;
 
-assign ws_gpr_we_r = ws_gpr_we & ~ws_flush;
+assign ws_gpr_we_t = ws_gpr_we & ~ws_flush;
 
 assign ws_flush = exc_flush | ms_flush;
 
@@ -114,7 +114,7 @@ always @(posedge clk) begin
     end
 end
 
-assign rf_we    = ws_gpr_we_r && ws_valid;
+assign rf_we    = ws_gpr_we_t && ws_valid;
 assign rf_waddr = {5{ws_valid}} & ws_dest;
 assign rf_wdata = ws_inst_mfc0 ? ws_c0_rdata
                                : ws_final_result;

@@ -43,7 +43,7 @@ wire fs_flush;
 reg  ds_bd;
 
 wire        rf_we   ;
-wire        rf_we_r ;
+wire        rf_we_t ;
 wire [ 4:0] rf_waddr;
 wire [31:0] rf_wdata;
 
@@ -228,8 +228,8 @@ assign {rf_we   , //37:37
         rf_waddr, //36:32
         rf_wdata  //31:0
        } = ws_to_rf_bus;
-assign rf_we_r = rf_we & ~ds_flush;
-assign ws_dest = rf_waddr & {5{rf_we_r}};
+assign rf_we_t = rf_we & ~ds_flush;
+assign ws_dest = rf_waddr & {5{rf_we_t}};
 
 assign {es_res_valid, //37
         es_dest     , //36:32
@@ -533,7 +533,7 @@ regfile u_regfile(
     .rdata1 (rf_rdata1),
     .raddr2 (rf_raddr2),
     .rdata2 (rf_rdata2),
-    .we     (rf_we_r  ),
+    .we     (rf_we_t  ),
     .waddr  (rf_waddr ),
     .wdata  (rf_wdata )
     );
