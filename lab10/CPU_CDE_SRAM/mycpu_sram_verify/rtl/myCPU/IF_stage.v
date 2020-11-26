@@ -61,7 +61,8 @@ assign fs_exc_adel_if = |fs_pc[1:0];
 assign fs_badvaddr  = {32{fs_exc_adel_if}} & fs_pc;
 
 /* pre-IF stage */
-assign to_fs_ready_go = ~br_stall;
+assign to_fs_ready_go = ~br_stall
+                      |  fs_flush;
 assign to_fs_valid    = ~reset & to_fs_ready_go; // edited later in axi
 assign seq_pc         = fs_pc + 3'h4;
 assign nextpc         = fs_flush ? ws_pc_gen_exc
@@ -84,7 +85,7 @@ always @(posedge clk) begin
     end
 
     if (reset) begin
-        fs_pc <= 32'hbfbffffc;  //trick: to make nextpc be 0xbfc00000 during reset
+        fs_pc <= 32'hbfbffffc;
     end
     else if (to_fs_valid && fs_allowin) begin
         fs_pc <= nextpc;

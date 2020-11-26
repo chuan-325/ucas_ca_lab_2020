@@ -191,7 +191,6 @@ wire type_nr;
 // if rx == dests?
 wire rs_eq_dests;
 wire rt_eq_dests;
-wire st_eq_dests;
 wire ds_no_crash_es;
 wire ds_no_crash_ms;
 
@@ -556,7 +555,9 @@ assign rs_se_0  =  rs_value[31] | (~|rs_value);
 assign rs_st_0  =  rs_value[31] ;
 
 // br info
-assign br_stall   = 1'b0; //(inst_beq || inst_bne ) & st_eq_dests;
+assign br_stall = ~es_res_valid
+                 &(rt_eq_dests  & (inst_beq|inst_bne)
+                  |rs_eq_dests  &  inst_branch);
 assign br_taken   =(inst_beq    &  rs_eq_rt
                   | inst_bne    & ~rs_eq_rt
                   | inst_bgez   &  rs_be_0
