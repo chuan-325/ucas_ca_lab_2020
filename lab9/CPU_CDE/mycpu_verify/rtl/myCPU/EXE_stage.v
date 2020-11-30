@@ -268,7 +268,7 @@ always @(posedge clk) begin
     if (reset) begin
         es_pre_flush <= 1'b0;
     end
-    else if (es_ex & es_valid & ~es_flush ) begin
+    else if (es_ex && !es_flush) begin
         es_pre_flush <= 1'b1;
     end
     else if (es_flush) begin
@@ -285,7 +285,7 @@ assign es_exc_of = es_of_valid & es_alu_of;
 
 /* data_sram */
 assign data_sram_en    = ~es_ignore;
-assign data_sram_wen   = es_mem_we_r & es_valid & ~es_ignore ? write_strb : 4'h0;
+assign data_sram_wen   = es_mem_we_r & ~es_ignore ? write_strb : 4'h0;
 assign data_sram_addr  = es_alu_result;
 assign data_sram_wdata = write_data;
 
@@ -390,14 +390,14 @@ always @(posedge clk) begin
         hi <= 32'b0;
         lo <= 32'b0;
     end
-    else if (es_hilo_we & es_valid & ~es_ignore) begin // mult/div
+    else if (es_hilo_we & ~es_ignore) begin // mult/div
         hi <= es_hi_res;
         lo <= es_lo_res;
     end
-    else if (es_inst_mthi & es_valid & ~es_ignore) begin // mthi
+    else if (es_inst_mthi & ~es_ignore) begin // mthi
         hi <= es_rs_value;
     end
-    else if (es_inst_mtlo & es_valid & ~es_ignore) begin // mtlo
+    else if (es_inst_mtlo & ~es_ignore) begin // mtlo
         lo <= es_rs_value;
     end
 end
