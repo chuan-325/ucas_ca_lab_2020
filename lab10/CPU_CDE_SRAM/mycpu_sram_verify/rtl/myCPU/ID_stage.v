@@ -198,7 +198,7 @@ wire exc_ri;
 wire ds_of_valid;
 wire exc_adel_if;
 
-wire [2:0] ds_sel;
+wire [2:0] sel;
 wire [7:0] in10_3;
 
 wire inst_arith;
@@ -241,9 +241,10 @@ assign {ms_res_valid, //37
         ms_res        //31:0
         } = ms_to_ds_bus;
 
-assign br_bus = {br_stall , // 33
-                 br_taken , // 32
-                 br_target  // 31:0
+assign br_bus = {ds_to_es_valid, //34
+                 br_stall, //33
+                 br_taken, //32
+                 br_target //31:0
                  };
 
 assign ds_to_es_bus = {ds_of_valid,  //199
@@ -257,7 +258,7 @@ assign ds_to_es_bus = {ds_of_valid,  //199
                        inst_sysc  ,  //160
                        inst_mfc0  ,  //159
                        inst_mtc0  ,  //158
-                       ds_sel     ,  //157:155
+                       sel        ,  //157:155
                        rd         ,  //154:150
                        ls_type    ,  //149:144
                        inst_mtlo  ,  //143     | op
@@ -284,9 +285,9 @@ assign ds_to_es_bus = {ds_of_valid,  //199
                       };
 
 assign ds_flush       = exc_flush | fs_flush;
-assign ds_allowin     =~ds_valid
-                      | ds_ready_go & es_allowin
-                      | ds_flush;
+assign ds_allowin     = !ds_valid
+                      || ds_ready_go & es_allowin
+                      || ds_flush;
 assign ds_to_es_valid = ds_valid && ds_ready_go;
 
 always @(posedge clk) begin
@@ -321,7 +322,7 @@ assign sa     = ds_inst[10: 6];
 assign func   = ds_inst[ 5: 0];
 assign imm    = ds_inst[15: 0];
 assign jidx   = ds_inst[25: 0];
-assign ds_sel = ds_inst[ 2: 0];
+assign sel    = ds_inst[ 2: 0];
 assign in10_3 = ds_inst[10: 3];
 
 decoder_6_64 u_dec0(.in(op  ), .out(op_d  ));
@@ -555,9 +556,9 @@ assign rs_se_0  =  rs_value[31] | (~|rs_value);
 assign rs_st_0  =  rs_value[31] ;
 
 // br info
-assign br_stall = ~es_res_valid
-                 &(rt_eq_dests  & (inst_beq|inst_bne)
-                  |rs_eq_dests  &  inst_branch);
+assign br_stall =~es_res_valid
+                &(rt_eq_es_dest & (inst_beq|inst_bne)
+                 |rs_eq_es_dest &  inst_branch);
 assign br_taken   =(inst_beq    &  rs_eq_rt
                   | inst_bne    & ~rs_eq_rt
                   | inst_bgez   &  rs_be_0

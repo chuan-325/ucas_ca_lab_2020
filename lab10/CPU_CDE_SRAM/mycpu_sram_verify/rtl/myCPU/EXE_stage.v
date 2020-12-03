@@ -17,10 +17,13 @@ module exe_stage(
     // flush
     input                          exc_flush      ,
     // data sram interface
-    output                         data_sram_en   ,
-    output [ 3:0]                  data_sram_wen  ,
-    output [31:0]                  data_sram_addr ,
-    output [31:0]                  data_sram_wdata
+    output  reg   data_sram_req,
+    output        data_sram_wr,
+    output [ 1:0] data_sram_size,
+    output [31:0] data_sram_addr,
+    output [ 3:0] data_sram_wstrb,
+    output [31:0] data_sram_wdata,
+    input         data_sram_addr_ok //in
 );
 
 /*  DECLARATION  */
@@ -34,15 +37,6 @@ reg [31:0] hi;
 reg [31:0] lo;
 
 reg  [`DS_TO_ES_BUS_WD -1:0] ds_to_es_bus_r;
-
-wire es_inst_mtlo;
-wire es_inst_mthi;
-wire es_inst_mflo;
-wire es_inst_mfhi;
-wire es_op_divu  ;
-wire es_op_div   ;
-wire es_op_multu ;
-wire es_op_mult  ;
 
 wire        es_of_valid ;
 wire [31:0] ds_badvaddr;
@@ -68,14 +62,14 @@ wire        es_src2_is_imm;
 wire        es_src2_is_8  ;
 wire        es_gpr_we     ;
 wire        es_mem_we     ;
-wire        es_mem_we_r   ;
 wire [ 4:0] es_dest       ;
 wire [15:0] es_imm        ;
 wire [31:0] es_rs_value   ;
 wire [31:0] es_rt_value   ;
 wire [31:0] es_pc         ;
 
-
+wire es_divs_fi;
+wire es_mems_fi;
 
 wire es_flush;
 wire ds_flush;
@@ -83,8 +77,16 @@ wire es_ignore;
 wire es_ex;
 wire es_bd;
 wire es_res_valid;
-wire es_div_ready;
 reg  es_pre_flush;
+
+wire es_inst_mtlo;
+wire es_inst_mthi;
+wire es_inst_mflo;
+wire es_inst_mfhi;
+wire es_op_divu  ;
+wire es_op_div   ;
+wire es_op_multu ;
+wire es_op_mult  ;
 
 wire [31:0] es_alu_src1  ;
 wire [31:0] es_alu_src2  ;
@@ -180,7 +182,6 @@ assign {es_of_valid    ,  //199
         es_pc             //31 :0
        } = ds_to_es_bus_r;
 
-assign es_mem_we_r    = es_mem_we & ~es_ignore;
 
 assign es_exc_adel_ld = es_ls_type[2] & es_gpr_we &  data_sram_addr[0]   // l hw
                       | es_ls_type[0] & es_gpr_we & |data_sram_addr[1:0];// l w
@@ -242,10 +243,28 @@ assign es_to_ds_bus = {`ES_TO_DS_BUS_WD{ es_valid
                                              es_dest,      //36:32 es_dest
                                              es_res_r      //31: 0 es_res_r
                                              };
-// es_ready_go change from 1'b1
-assign es_div_ready   =~(es_op_div
-                        |es_op_divu) | es_hilo_we;
-assign es_ready_go    = es_div_ready | es_flush;
+
+assign es_divs_fi = ~(es_op_div
+                     |es_op_divu) | es_hilo_we;
+
+reg dr_shkhd;
+always @(posedge clk) begin
+    if (reset) begin
+        dr_shkhd <= 1'b0;
+    end
+    else if (dr_shkhd
+              && es_to_ms_valid && ms_allowin) begin
+        dr_shkhd <= 1'b0;
+    end
+    else if (data_sram_req && data_sram_addr_ok) begin
+        dr_shkhd <= 1'b1;
+    end
+end
+
+assign es_mems_fi = ~(es_mem_re
+                     |es_mem_we) | dr_shkhd;
+assign es_ready_go    = es_divs_fi && es_mems_fi
+                      || es_flush;
 assign es_allowin     = !es_valid
                       || es_ready_go && ms_allowin
                       || es_flush;
@@ -268,7 +287,7 @@ always @(posedge clk) begin
     if (reset) begin
         es_pre_flush <= 1'b0;
     end
-    else if (es_ex & es_valid & ~es_flush ) begin
+    else if (es_ex & ~es_flush ) begin
         es_pre_flush <= 1'b1;
     end
     else if (es_flush) begin
@@ -284,12 +303,40 @@ assign es_res_r  = {32{  es_inst_mfhi}}  & hi
 assign es_exc_of = es_of_valid & es_alu_of;
 
 /* data_sram */
-assign data_sram_en    = ~es_ignore;
-assign data_sram_wen   = es_mem_we_r & es_valid & ~es_ignore ? write_strb : 4'h0;
-assign data_sram_addr  = es_alu_result;
+
+wire [3:0] wstrb_bits;
+assign wstrb_bits = write_strb[3]
+                  + write_strb[2]
+                  + write_strb[1]
+                  + write_strb[0];
+
+assign data_sram_wr = es_mem_we
+                    &~es_ignore ;
+assign data_sram_size = wstrb_bits == 3'h1 ? 2'h0
+                      : wstrb_bits == 3'h2 ? 2'h1
+                      : 2'h2;
+assign data_sram_wstrb = {4{data_sram_wr}} & write_strb;
 assign data_sram_wdata = write_data;
 
-assign es_badvaddr = es_exc_adel_if ? ds_badvaddr : data_sram_addr; // if:ld/st
+// req
+always @(posedge clk) begin
+    if (reset) begin
+        data_sram_req <= 1'b0;
+    end
+    else if (es_ignore) begin
+        data_sram_req <= 1'b0;
+    end
+    else if (data_sram_req && data_sram_addr_ok) begin
+        data_sram_req <= 1'b0;
+    end else if (!data_sram_req
+               &&!dr_shkhd) begin // ~es_ignored
+        data_sram_req <= (es_mem_re|es_mem_we) & es_valid;
+    end
+end
+
+assign data_sram_addr  = es_alu_result;
+
+assign es_badvaddr = es_exc_adel_if ? ds_badvaddr : data_sram_addr;
 
 assign write_strb = {4{ es_ls_type[4]}} & write_strb_swr // SWR
                   | {4{ es_ls_type[3]}} & write_strb_swl // SWL
@@ -390,14 +437,14 @@ always @(posedge clk) begin
         hi <= 32'b0;
         lo <= 32'b0;
     end
-    else if (es_hilo_we & es_valid & ~es_ignore) begin // mult/div
+    else if (es_hilo_we && !es_ignore) begin // mult/div
         hi <= es_hi_res;
         lo <= es_lo_res;
     end
-    else if (es_inst_mthi & es_valid & ~es_ignore) begin // mthi
+    else if (es_inst_mthi && !es_ignore) begin // mthi
         hi <= es_rs_value;
     end
-    else if (es_inst_mtlo & es_valid & ~es_ignore) begin // mtlo
+    else if (es_inst_mtlo && !es_ignore) begin // mtlo
         lo <= es_rs_value;
     end
 end
