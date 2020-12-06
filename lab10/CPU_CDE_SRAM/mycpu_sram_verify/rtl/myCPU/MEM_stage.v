@@ -43,6 +43,8 @@ wire [31:0] ms_final_result;
 
 wire [31:0] ms_badvaddr;
 
+wire ms_mems_fi;
+
 wire ms_flush;
 wire es_flush;
 
@@ -81,11 +83,11 @@ wire ms_exc_adel_ld;
 wire ms_exc_ades;
 wire ms_exc_of;
 
-wire [31:0] drdata_now;
+wire [31:0] mdata_now;
 
-reg  [31:0] drdata_buf;
+reg  [31:0] mdata_buf;
 
-reg         drdata_buf_valid;
+reg         mdata_buf_valid;
 
 
 /*  LOGIC  */
@@ -149,9 +151,13 @@ assign ms_to_ds_bus = {`MS_TO_DS_BUS_WD{ ms_valid
                                              ms_final_result  // 31: 0
                                              };
 
-assign ms_ready_go    = !(ms_mem_re || ms_mem_we)
-                      ||(data_sram_data_ok && ws_allowin
-                       ||drdata_buf_valid);
+assign ms_mems_fi = data_sram_data_ok && ws_allowin
+                  ||mdata_buf_valid
+                  ||ms_exc_ades
+                  ||ms_exc_adel_ld;
+
+assign ms_ready_go    =!(ms_mem_re||ms_mem_we)
+                      || ms_mems_fi;
 assign ms_allowin     = !ms_valid
                       || ms_ready_go && ws_allowin
                       || ms_flush;
@@ -171,24 +177,24 @@ end
 
 /* data_sram */
 
-assign drdata_now = data_sram_data_ok ? data_sram_rdata
-                                      : drdata_buf     ;
+assign mdata_now = data_sram_data_ok ? data_sram_rdata
+                                     : mdata_buf     ;
 always @(posedge clk) begin
     if (reset) begin
-        drdata_buf <= 32'b0;
+        mdata_buf <= 32'b0;
     end
     else if (data_sram_data_ok) begin
-        drdata_buf <= data_sram_rdata;
+        mdata_buf <= data_sram_rdata;
     end
 
     if (reset) begin
-        drdata_buf_valid <= 1'b0;
+        mdata_buf_valid <= 1'b0;
     end
     else if (ms_to_ws_valid && ws_allowin) begin
-        drdata_buf_valid <= 1'b0;
+        mdata_buf_valid <= 1'b0;
     end
     else if (data_sram_data_ok) begin
-        drdata_buf_valid <= 1'b1;
+        mdata_buf_valid <= 1'b1;
     end
 end
 
@@ -196,7 +202,7 @@ assign mem_result = {32{ms_type_lwr}} & mem_res_lwr // LWR
                   | {32{ms_type_lwl}} & mem_res_lwl // LWL
                   | {32{ms_type_lhg}} & mem_res_lhg // LH/LHU
                   | {32{ms_type_lbg}} & mem_res_lbg // LB/LBU
-                  | {32{ms_type_lw }} & drdata_now ; // LW
+                  | {32{ms_type_lw }} & mdata_now; // LW
 
 assign ms_final_result = ms_inst_mtc0 ? ms_rt_value
                        : ms_mem_re    ? mem_result
@@ -215,24 +221,24 @@ assign ms_type_lhg =  ms_ls_type[2]; // lh/lhu
 assign ms_type_lbg =  ms_ls_type[1]; // lb/lbu
 assign ms_type_lw  =  ms_ls_type[0];
 // prepare hight bit in byte
-assign mem_res_s_07 = ~ms_ls_type[5] & drdata_now[ 7];
-assign mem_res_s_15 = ~ms_ls_type[5] & drdata_now[15];
-assign mem_res_s_23 = ~ms_ls_type[5] & drdata_now[23];
-assign mem_res_s_31 = ~ms_ls_type[5] & drdata_now[31];
+assign mem_res_s_07 = ~ms_ls_type[5] & mdata_now[ 7];
+assign mem_res_s_15 = ~ms_ls_type[5] & mdata_now[15];
+assign mem_res_s_23 = ~ms_ls_type[5] & mdata_now[23];
+assign mem_res_s_31 = ~ms_ls_type[5] & mdata_now[31];
 // prepare mem_res selection
-assign mem_res_lwr = {32{ms_lad_d[0]}} &  drdata_now[31:0]                       // LWR
-                   | {32{ms_lad_d[1]}} & {ms_rt_value[31:24], drdata_now[31: 8]}
-                   | {32{ms_lad_d[2]}} & {ms_rt_value[31:16], drdata_now[31:16]}
-                   | {32{ms_lad_d[3]}} & {ms_rt_value[31: 8], drdata_now[31:24]};
-assign mem_res_lwl = {32{ms_lad_d[0]}} & {drdata_now[ 7:0], ms_rt_value[23:0]}   // LWL
-                   | {32{ms_lad_d[1]}} & {drdata_now[15:0], ms_rt_value[15:0]}
-                   | {32{ms_lad_d[2]}} & {drdata_now[23:0], ms_rt_value[ 7:0]}
-                   | {32{ms_lad_d[3]}} &  drdata_now;
-assign mem_res_lhg = {32{~ms_lad[1] }} & {{16{mem_res_s_15}}, drdata_now[15: 0]} // LH/LHU
-                   | {32{ ms_lad[1] }} & {{16{mem_res_s_31}}, drdata_now[31:16]};
-assign mem_res_lbg = {32{ms_lad_d[0]}} & {{24{mem_res_s_07}}, drdata_now[ 7: 0]} // LB/LBU
-                   | {32{ms_lad_d[1]}} & {{24{mem_res_s_15}}, drdata_now[15: 8]}
-                   | {32{ms_lad_d[2]}} & {{24{mem_res_s_23}}, drdata_now[23:16]}
-                   | {32{ms_lad_d[3]}} & {{24{mem_res_s_31}}, drdata_now[31:24]};
+assign mem_res_lwr = {32{ms_lad_d[0]}} &  mdata_now[31:0]                       // LWR
+                   | {32{ms_lad_d[1]}} & {ms_rt_value[31:24], mdata_now[31: 8]}
+                   | {32{ms_lad_d[2]}} & {ms_rt_value[31:16], mdata_now[31:16]}
+                   | {32{ms_lad_d[3]}} & {ms_rt_value[31: 8], mdata_now[31:24]};
+assign mem_res_lwl = {32{ms_lad_d[0]}} & {mdata_now[ 7:0], ms_rt_value[23:0]}   // LWL
+                   | {32{ms_lad_d[1]}} & {mdata_now[15:0], ms_rt_value[15:0]}
+                   | {32{ms_lad_d[2]}} & {mdata_now[23:0], ms_rt_value[ 7:0]}
+                   | {32{ms_lad_d[3]}} &  mdata_now;
+assign mem_res_lhg = {32{~ms_lad[1] }} & {{16{mem_res_s_15}}, mdata_now[15: 0]} // LH/LHU
+                   | {32{ ms_lad[1] }} & {{16{mem_res_s_31}}, mdata_now[31:16]};
+assign mem_res_lbg = {32{ms_lad_d[0]}} & {{24{mem_res_s_07}}, mdata_now[ 7: 0]} // LB/LBU
+                   | {32{ms_lad_d[1]}} & {{24{mem_res_s_15}}, mdata_now[15: 8]}
+                   | {32{ms_lad_d[2]}} & {{24{mem_res_s_23}}, mdata_now[23:16]}
+                   | {32{ms_lad_d[3]}} & {{24{mem_res_s_31}}, mdata_now[31:24]};
 
 endmodule

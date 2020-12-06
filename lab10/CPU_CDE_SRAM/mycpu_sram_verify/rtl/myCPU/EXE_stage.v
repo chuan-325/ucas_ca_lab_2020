@@ -133,6 +133,7 @@ wire [31:0] write_data_swl;
 wire [31:0] write_data_sh;
 wire [31:0] write_data_sb;
 
+wire [ 3:0] wstrb_bits;
 wire [ 3:0] write_strb;
 wire [31:0] write_data;
 
@@ -142,6 +143,8 @@ wire [4:0] es_rd;
 wire [5:0] es_ls_type;
 wire [1:0] es_lad  ;
 wire [3:0] es_lad_d;
+
+reg dr_shkhd;
 
 /*  LOGIC  */
 
@@ -244,16 +247,12 @@ assign es_to_ds_bus = {`ES_TO_DS_BUS_WD{ es_valid
                                              es_res_r      //31: 0 es_res_r
                                              };
 
-assign es_divs_fi = ~(es_op_div
-                     |es_op_divu) | es_hilo_we;
-
-reg dr_shkhd;
 always @(posedge clk) begin
     if (reset) begin
         dr_shkhd <= 1'b0;
     end
     else if (dr_shkhd
-              && es_to_ms_valid && ms_allowin) begin
+          && es_to_ms_valid && ms_allowin) begin
         dr_shkhd <= 1'b0;
     end
     else if (data_sram_req && data_sram_addr_ok) begin
@@ -261,14 +260,19 @@ always @(posedge clk) begin
     end
 end
 
-assign es_mems_fi = ~(es_mem_re
-                     |es_mem_we) | dr_shkhd;
+assign es_divs_fi =!(es_op_div||es_op_divu)
+                  || es_hilo_we;
+assign es_mems_fi =!(es_mem_re||es_mem_we)
+                  || dr_shkhd
+                  || es_exc_adel_ld
+                  || es_exc_ades;
+
 assign es_ready_go    = es_divs_fi && es_mems_fi
-                      || es_flush;
-assign es_allowin     = !es_valid
-                      || es_ready_go && ms_allowin
-                      || es_flush;
-assign es_to_ms_valid =  es_valid && es_ready_go;
+                      ||es_flush;
+assign es_allowin     =!es_valid
+                      ||es_ready_go && ms_allowin
+                      ||es_flush;
+assign es_to_ms_valid = es_valid && es_ready_go;
 always @(posedge clk) begin
     if (reset) begin
         es_valid <= 1'b0;
@@ -304,14 +308,13 @@ assign es_exc_of = es_of_valid & es_alu_of;
 
 /* data_sram */
 
-wire [3:0] wstrb_bits;
 assign wstrb_bits = write_strb[3]
                   + write_strb[2]
                   + write_strb[1]
                   + write_strb[0];
 
 assign data_sram_wr = es_mem_we
-                    &~es_ignore ;
+                    &~es_ignore;
 assign data_sram_size = wstrb_bits == 3'h1 ? 2'h0
                       : wstrb_bits == 3'h2 ? 2'h1
                       : 2'h2;

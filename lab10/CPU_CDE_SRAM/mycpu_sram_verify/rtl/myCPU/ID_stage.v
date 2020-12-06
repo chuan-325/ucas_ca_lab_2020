@@ -571,7 +571,7 @@ assign br_taken   =(inst_beq    &  rs_eq_rt
                   | inst_jalr
                   | inst_j
                   | inst_jr
-                  ) && ds_valid & ~ds_flush;
+                  ) & ds_valid & ~ds_flush;
 assign br_target   = {32{inst_branch}} & (fs_pc + {{14{imm[15]}}, imm[15:0], 2'b0})
                    | {32{inst_jxr}}    &  rs_value
                    | {32{inst_jnr}}    & {fs_pc[31:28], jidx[25:0], 2'b0};

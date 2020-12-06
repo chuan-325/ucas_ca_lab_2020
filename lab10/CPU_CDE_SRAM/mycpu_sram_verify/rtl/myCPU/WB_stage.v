@@ -57,6 +57,9 @@ wire ws_exc_adel_ld;
 wire ws_exc_ades;
 wire ws_exc_intr;
 
+reg  ws_has_int;
+wire ws_c0_has_int;
+
 wire [ 2:0] ws_sel;
 wire [ 4:0] ws_rd;
 wire [31:0] ws_c0_wdata;
@@ -127,7 +130,8 @@ assign ws_ex =( ws_exc_intr
               | ws_exc_adel_if
               | ws_exc_adel_ld
               | ws_exc_ades
-              | ws_exc_of) & ~ms_flush; // flushed => DO NOT CHANGE CPRs
+              | ws_exc_of)
+              & ~ms_flush; // flushed => DO NOT CHANGE CPRs
 assign ws_c0_wdata = {32{ws_inst_mtc0}} & ws_final_result;
 assign ws_ext_int_in = 6'b0; // exterior INTR
 assign ws_excode = ws_exc_intr      ? `EX_INTR :
@@ -140,6 +144,20 @@ assign ws_excode = ws_exc_intr      ? `EX_INTR :
                |{5{ws_exc_ades}}    & `EX_ADES);
 assign ws_pc_gen_exc = {32{ws_inst_eret}} & ws_c0_rdata
                      | {32{ws_ex}}        & 32'hbfc00380;
+
+always @(posedge clk) begin
+    if (reset) begin
+        ws_has_int <= 1'b0;
+    end
+    else if (ws_c0_has_int) begin
+        ws_has_int <= 1'b1;
+    end
+    else if (ws_has_int && ws_valid) begin
+        ws_has_int <= 1'b0;
+    end
+end
+assign ws_exc_intr = ws_c0_has_int
+                   ||ws_has_int;
 
 regs_c0 u_reg_c0(
     .clk        (clk          ),
@@ -158,20 +176,13 @@ regs_c0 u_reg_c0(
     .wb_rd      (ws_rd        ),
     .wb_sel     (ws_sel       ),
     .c0_wdata   (ws_c0_wdata  ),
-    .has_int    (ws_exc_intr  ), //out
+    .has_int    (ws_c0_has_int), //out
     .c0_rdata   (ws_c0_rdata  )
 );
 
-assign exc_flush = ( ws_exc_intr
-                   | ws_inst_eret
-                   | ws_exc_adel_if
-                   | ws_exc_ri
-                   | ws_exc_of
-                   | ws_exc_bp
-                   | ws_exc_sysc
-                   | ws_exc_adel_ld
-                   | ws_exc_ades)
-                   & ws_valid & ~ms_flush;
+assign exc_flush = ( ws_ex
+                   | ws_inst_eret & ~ms_flush)
+                   & ws_valid ;
 
 // debug info generate
 assign debug_wb_pc       = ws_pc;
