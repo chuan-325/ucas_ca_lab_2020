@@ -90,7 +90,7 @@ assign to_fs_ready_go = !br_stall
                        &&(inst_sram_req && inst_sram_addr_ok
                         ||ir_shkhd);
 assign to_fs_valid = !reset
-                  && to_fs_ready_go;// && fs_allowin;
+                  && to_fs_ready_go;
 
 /* inst_sram */
 
@@ -119,6 +119,7 @@ end
 // addr
 assign inst_sram_addr = exc_flush     ? ws_pc_gen_exc
                       : (br_taken
+                       & br_buf_valid
                        &~fs_flush)    ? br_target
                       : npc_buf_valid ? npc_buf
                       : seq_pc;

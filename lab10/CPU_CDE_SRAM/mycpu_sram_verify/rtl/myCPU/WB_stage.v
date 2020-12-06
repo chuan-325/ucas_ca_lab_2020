@@ -100,7 +100,8 @@ assign ws_to_rf_bus = {rf_we   ,  //37:37
                        rf_wdata   //31:0  wdata
                       };
 
-assign ws_ready_go = 1'b1;
+assign ws_ready_go = !ws_gpr_we
+                   ||!ws_flush;
 assign ws_allowin  = !ws_valid
                    || ws_ready_go
                    || ws_flush;
