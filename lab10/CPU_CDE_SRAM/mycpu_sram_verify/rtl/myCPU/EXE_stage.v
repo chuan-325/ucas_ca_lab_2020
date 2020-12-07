@@ -291,10 +291,11 @@ always @(posedge clk) begin
     if (reset) begin
         es_pre_flush <= 1'b0;
     end
-    else if (es_ex & ~es_flush ) begin
-        es_pre_flush <= 1'b1;
+    else if (!es_pre_flush && !es_flush) begin
+        es_pre_flush <= es_ex & es_valid;
     end
-    else if (es_flush) begin
+    else if (es_pre_flush
+          && es_flush) begin
         es_pre_flush <= 1'b0;
     end
 end

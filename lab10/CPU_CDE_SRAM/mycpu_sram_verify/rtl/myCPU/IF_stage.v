@@ -49,7 +49,7 @@ wire        fs_exc_adel_if;
 wire        ds_to_es_valid;
 
 wire        fs_flush;
-reg         exc_flush_r;
+reg         fs_exc_flush_r;
 reg         rdata_ok_r;
 
 reg         ir_shkhd;
@@ -78,7 +78,7 @@ assign fs_to_ds_bus = {fs_badvaddr   ,  //97:66
                        fs_inst       ,  //63:32
                        fs_pc        };  //31: 0
 
-assign fs_flush       = exc_flush | exc_flush_r;
+assign fs_flush       = exc_flush | fs_exc_flush_r;
 assign fs_exc_adel_if = |fs_pc[1:0];
 
 assign fs_badvaddr = {32{fs_exc_adel_if}} & fs_pc;
@@ -190,16 +190,16 @@ always @(posedge clk) begin
         fs_first <= 1'b0;
     end
 end
-// exc_flush_r: store flush until flow
+// fs_exc_flush_r: store flush until flow
 always @(posedge clk) begin
     if (reset) begin
-        exc_flush_r <= 1'b0;
+        fs_exc_flush_r <= 1'b0;
     end
     else if (exc_flush) begin
-        exc_flush_r <= 1'b1;
+        fs_exc_flush_r <= 1'b1;
     end
     else if (fs_to_ds_valid && ds_allowin) begin
-        exc_flush_r <= 1'b0;
+        fs_exc_flush_r <= 1'b0;
     end
 end
 // ir_shkhd: hands shaked and not recv yet
@@ -282,7 +282,7 @@ always @(posedge clk) begin
     if (reset) begin
         npc_buf <= 32'hbfc00000;
     end
-    else if (exc_flush) begin//!
+    else if (exc_flush) begin
         npc_buf <= ws_pc_gen_exc;
     end
     else if (!fs_flush
