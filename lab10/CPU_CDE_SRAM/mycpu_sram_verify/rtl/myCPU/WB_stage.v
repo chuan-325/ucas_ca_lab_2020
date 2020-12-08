@@ -93,20 +93,18 @@ assign {ws_exc_of      , //121
 
 assign ws_gpr_we_t = ws_gpr_we & ~ws_flush;
 
-assign ws_flush = exc_flush | ms_flush;
+assign ws_flush = exc_flush;
 
 assign ws_to_rf_bus = {rf_we   ,  //37:37
                        rf_waddr,  //36:32 dest
                        rf_wdata   //31:0  wdata
                       };
 
-assign ws_ready_go = !ws_gpr_we
-                   ||!ws_flush;
+assign ws_ready_go = 1'b1;
 assign ws_allowin  = !ws_valid
-                   || ws_ready_go
-                   || ws_flush;
+                   || ws_ready_go;
 always @(posedge clk) begin
-    if (reset) begin
+    if (reset || exc_flush) begin
         ws_valid <= 1'b0;
     end
     else if (ws_allowin) begin
@@ -132,7 +130,7 @@ assign ws_ex =( ws_exc_intr
               | ws_exc_adel_ld
               | ws_exc_ades
               | ws_exc_of)
-              & ~ms_flush; // flushed => DO NOT CHANGE CPRs
+              & ws_valid; // flushed => DO NOT CHANGE CPRs
 assign ws_c0_wdata = {32{ws_inst_mtc0}} & ws_final_result;
 assign ws_ext_int_in = 6'b0; // exterior INTR
 assign ws_excode = ws_exc_intr      ? `EX_INTR :
@@ -182,7 +180,7 @@ regs_c0 u_reg_c0(
 );
 
 assign exc_flush = ( ws_ex
-                   | ws_inst_eret & ~ms_flush)
+                   | ws_inst_eret)
                    & ws_valid ;
 
 // debug info generate

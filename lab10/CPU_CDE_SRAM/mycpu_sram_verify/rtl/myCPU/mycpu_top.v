@@ -53,6 +53,7 @@ wire  [`MS_TO_DS_BUS_WD -1:0] ms_to_ds_bus;
 // exc processing: flush & epc
 wire [31:0] ws_pc_gen_exc;
 wire        exc_flush;
+wire        ms_ex;
 
 
 // IF stage
@@ -120,7 +121,8 @@ exe_stage exe_stage(
     //to ds raw
     .es_to_ds_bus   (es_to_ds_bus   ),
     //flush
-    .exc_flush     (exc_flush     ),
+    .exc_flush      (exc_flush     ),
+    .ms_ex          (ms_ex         ),
     // data sram interface
     .data_sram_req  (data_sram_req  ),
     .data_sram_wr   (data_sram_wr   ),
@@ -146,7 +148,8 @@ mem_stage mem_stage(
     //to ds raw
     .ms_to_ds_bus   (ms_to_ds_bus   ),
     //flush
-    .exc_flush     (exc_flush     ),
+    .exc_flush      (exc_flush     ),
+    .ms_ex          (ms_ex         ),
     //from data-sram
     .data_sram_data_ok(data_sram_data_ok),
     .data_sram_rdata(data_sram_rdata)

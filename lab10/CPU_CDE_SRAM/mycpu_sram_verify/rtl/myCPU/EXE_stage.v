@@ -16,6 +16,7 @@ module exe_stage(
     output [`ES_TO_DS_BUS_WD -1:0] es_to_ds_bus   ,
     // flush
     input                          exc_flush      ,
+    input                          ms_ex          ,
     // data sram interface
     output  reg   data_sram_req,
     output        data_sram_wr,
@@ -77,7 +78,6 @@ wire es_ignore;
 wire es_ex;
 wire es_bd;
 wire es_res_valid;
-reg  es_pre_flush;
 
 wire es_inst_mtlo;
 wire es_inst_mthi;
@@ -202,7 +202,7 @@ assign es_lad_d[2] = (es_lad==2'b10);
 assign es_lad_d[1] = (es_lad==2'b01);
 assign es_lad_d[0] = (es_lad==2'b00);
 
-assign es_flush = exc_flush | ds_flush;
+assign es_flush = exc_flush;
 assign es_ex    = es_inst_eret
                 | es_exc_adel_if
                 | es_exc_ri
@@ -267,14 +267,12 @@ assign es_mems_fi =!(es_mem_re||es_mem_we)
                   || es_exc_adel_ld
                   || es_exc_ades;
 
-assign es_ready_go    = es_divs_fi && es_mems_fi
-                      ||es_flush;
+assign es_ready_go    = es_divs_fi && es_mems_fi;
 assign es_allowin     =!es_valid
-                      ||es_ready_go && ms_allowin
-                      ||es_flush;
+                      ||es_ready_go && ms_allowin;
 assign es_to_ms_valid = es_valid && es_ready_go;
 always @(posedge clk) begin
-    if (reset) begin
+    if (reset || exc_flush) begin
         es_valid <= 1'b0;
     end
     else if (es_allowin) begin
@@ -283,20 +281,6 @@ always @(posedge clk) begin
 
     if (ds_to_es_valid && es_allowin) begin
         ds_to_es_bus_r <= ds_to_es_bus;
-    end
-end
-
-// pre-flush
-always @(posedge clk) begin
-    if (reset) begin
-        es_pre_flush <= 1'b0;
-    end
-    else if (!es_pre_flush && !es_flush) begin
-        es_pre_flush <= es_ex & es_valid;
-    end
-    else if (es_pre_flush
-          && es_flush) begin
-        es_pre_flush <= 1'b0;
     end
 end
 
@@ -427,7 +411,7 @@ assign es_hilo_we   = es_op_mult
                     | es_op_multu
                     | es_op_div  &  es_div_out_valid
                     | es_op_divu &  es_divu_out_valid;
-assign es_ignore = es_flush | es_pre_flush | es_ex;
+assign es_ignore = exc_flush | ms_ex | es_ex;
 
 assign es_hi_res    = {32{es_op_mult|es_op_multu}} & es_mult_result[63:32]
                     | {32{es_op_div             }} & es_div_dout[31:0]
@@ -441,14 +425,14 @@ always @(posedge clk) begin
         hi <= 32'b0;
         lo <= 32'b0;
     end
-    else if (es_hilo_we && !es_ignore) begin // mult/div
+    else if (es_hilo_we && !es_ignore && es_valid) begin // mult/div
         hi <= es_hi_res;
         lo <= es_lo_res;
     end
-    else if (es_inst_mthi && !es_ignore) begin // mthi
+    else if (es_inst_mthi && !es_ignore && es_valid) begin // mthi
         hi <= es_rs_value;
     end
-    else if (es_inst_mtlo && !es_ignore) begin // mtlo
+    else if (es_inst_mtlo && !es_ignore && es_valid) begin // mtlo
         lo <= es_rs_value;
     end
 end

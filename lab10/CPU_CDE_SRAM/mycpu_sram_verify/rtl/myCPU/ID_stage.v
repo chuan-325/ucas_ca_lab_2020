@@ -228,7 +228,7 @@ assign {rf_we   , //37:37
         rf_waddr, //36:32
         rf_wdata  //31:0
        } = ws_to_rf_bus;
-assign rf_we_t = rf_we & ~ds_flush;
+assign rf_we_t = rf_we;
 assign ws_dest = rf_waddr & {5{rf_we_t}};
 
 assign {es_res_valid, //37
@@ -284,14 +284,13 @@ assign ds_to_es_bus = {ds_of_valid,  //199
                        ds_pc         //31 :0
                       };
 
-assign ds_flush       = exc_flush | fs_flush;
+assign ds_flush       = exc_flush;
 assign ds_allowin     = !ds_valid
-                      || ds_ready_go & es_allowin
-                      || ds_flush;
+                      || ds_ready_go & es_allowin;
 assign ds_to_es_valid = ds_valid && ds_ready_go;
 
 always @(posedge clk) begin
-    if (reset) begin
+    if (reset || exc_flush) begin
         ds_valid <= 1'b0;
     end
     else if (ds_allowin) begin
@@ -304,11 +303,11 @@ always @(posedge clk) begin
 end
 
 always @(posedge clk) begin
-    if(reset) begin
+    if(reset || exc_flush) begin
         ds_bd <= 1'b0;
     end
     else if (ds_valid) begin
-        ds_bd <= (inst_branch | inst_jxr | inst_jnr) & ~ds_flush;
+        ds_bd <= (inst_branch | inst_jxr | inst_jnr) ;
     end
 end
 
@@ -571,7 +570,7 @@ assign br_taken   =(inst_beq    &  rs_eq_rt
                   | inst_jalr
                   | inst_j
                   | inst_jr
-                  ) & ds_valid & ~ds_flush;
+                  ) & ds_valid;
 assign br_target   = {32{inst_branch}} & (fs_pc + {{14{imm[15]}}, imm[15:0], 2'b0})
                    | {32{inst_jxr}}    &  rs_value
                    | {32{inst_jnr}}    & {fs_pc[31:28], jidx[25:0], 2'b0};
@@ -651,7 +650,7 @@ assign ds_no_crash_ms = ~(rs_eq_ms_dest & type_rs
                         );
 assign ds_ready_go = (es_res_valid || ds_no_crash_es)
                   && (ms_res_valid || ds_no_crash_ms)
-                  ||  ds_flush;
+                  ;
 
 /* Need block? end */
 

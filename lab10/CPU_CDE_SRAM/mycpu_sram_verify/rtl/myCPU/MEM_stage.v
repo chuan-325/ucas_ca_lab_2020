@@ -16,6 +16,7 @@ module mem_stage(
     output [`MS_TO_DS_BUS_WD -1:0] ms_to_ds_bus  ,
     // flush
     input                          exc_flush,
+    output                         ms_ex    ,
     //from data-sram
     input         data_sram_data_ok,
     input  [31:0] data_sram_rdata
@@ -121,7 +122,7 @@ assign ms_mem_we = (|ms_ls_type) & ~ms_mem_re; //store
 
 assign ms_res_valid =~ms_inst_mfc0
                     & ms_to_ws_valid;
-assign ms_flush     = exc_flush | es_flush;
+assign ms_flush     = exc_flush;
 
 assign ms_to_ws_bus = {ms_exc_of      , //121
                        ms_badvaddr    , //120:89
@@ -144,6 +145,9 @@ assign ms_to_ws_bus = {ms_exc_of      , //121
                        ms_pc            //31: 0
                       };
 
+assign ms_ex = (ms_exc_of      || ms_exc_sysc || ms_exc_ri || ms_exc_bp ||
+                ms_exc_adel_if || ms_exc_adel_ld || ms_exc_ades || ms_inst_eret) && ms_valid;
+
 assign ms_to_ds_bus = {`MS_TO_DS_BUS_WD{ ms_valid
                                        & ms_gpr_we
                                        }} & {ms_res_valid,    // 37
@@ -160,10 +164,10 @@ assign ms_ready_go    =!(ms_mem_re||ms_mem_we)
                       || ms_mems_fi;
 assign ms_allowin     = !ms_valid
                       || ms_ready_go && ws_allowin
-                      || ms_flush;
+                      ;
 assign ms_to_ws_valid = ms_valid && ms_ready_go;
 always @(posedge clk) begin
-    if (reset) begin
+    if (reset || exc_flush) begin
         ms_valid <= 1'b0;
     end
     else if (ms_allowin) begin
