@@ -27,8 +27,8 @@ module if_stage(
 
 /*  DECLARATION  */
 
-wire        to_fs_valid;
-wire        to_fs_ready_go;
+wire        ps_to_fs_valid;
+wire        ps_ready_go;
 
 reg         fs_valid;
 wire        fs_ready_go;
@@ -52,7 +52,7 @@ wire        fs_flush;
 reg         fs_exc_flush_r;
 reg         rdata_ok_r;
 
-reg         ir_shkhd;
+reg         fs_addr_ok_r;
 reg         fs_first; // first time processed as shkhd
 reg         fs_throw;
 
@@ -64,6 +64,11 @@ reg [`BR_BUS_WD - 1:0] br_buf;
 reg [31:0]             npc_buf;
 reg [31:0]             inst_buf;
 
+
+wire fs_flush_t;
+assign fs_flush_t = exc_flush
+                  | fs_throw;
+
 /*  LOGIC  */
 
 assign ds_to_es_valid = br_bus[34];
@@ -74,7 +79,7 @@ assign {br_stall, //33
 
 assign fs_to_ds_bus = {fs_badvaddr   ,  //97:66
                        fs_exc_adel_if,  //65
-                       fs_flush      ,  //64
+                       fs_flush_t    ,  //64
                        fs_inst       ,  //63:32
                        fs_pc        };  //31: 0
 
@@ -86,11 +91,16 @@ assign seq_pc      = fs_pc + 3'h4;
 
 /* pre-IF stage */
 
-assign to_fs_ready_go = !br_stall
-                       &&(inst_sram_req && inst_sram_addr_ok
-                        ||ir_shkhd);
-assign to_fs_valid = !reset
-                  && to_fs_ready_go;
+wire fs_addr_ok;
+assign fs_addr_ok = inst_sram_req && inst_sram_addr_ok;
+
+wire ps_allowin;
+assign ps_allowin = ps_ready_go && fs_allowin;
+assign ps_ready_go = !br_stall
+                       &&(fs_addr_ok
+                        ||fs_addr_ok_r);
+assign ps_to_fs_valid = !reset
+                  && ps_ready_go;
 
 /* inst_sram */
 
@@ -103,15 +113,15 @@ always @(posedge clk) begin
     if (reset) begin
         inst_sram_req  <= 1'b0;
     end
-    else if (inst_sram_req && inst_sram_addr_ok) begin
+    else if (fs_addr_ok) begin
         inst_sram_req <= 1'b0;
     end
     else if (!inst_sram_req
           && !br_stall
           && (fs_first
-            ||inst_sram_data_ok && !fs_throw && to_fs_valid && fs_allowin // earlier
+            ||inst_sram_data_ok && !fs_throw && ps_to_fs_valid && fs_allowin // earlier
             ||inst_buf_valid && fs_valid && ds_allowin// later
-            ||fs_flush && !fs_throw && !ir_shkhd
+            ||fs_flush && !fs_throw && !fs_addr_ok_r
             )) begin
         inst_sram_req  <= 1'b1;
     end
@@ -128,7 +138,7 @@ always @(posedge clk) begin
     if (reset) begin
         inst_buf_valid <= 1'b0;
     end
-    else if (to_fs_valid && fs_allowin) begin
+    else if (ps_to_fs_valid && fs_allowin) begin
         inst_buf_valid <= 1'b0;
     end
     else if (exc_flush
@@ -154,7 +164,7 @@ assign fs_inst = (inst_sram_data_ok
 
 /* IF stage */
 
-assign fs_ready_go    = (!br_buf_valid||to_fs_ready_go)
+assign fs_ready_go    = (!br_buf_valid||ps_ready_go)
                       && inst_buf_valid;
 assign fs_allowin     = !fs_valid
                       || fs_ready_go && ds_allowin;
@@ -165,16 +175,16 @@ always @(posedge clk) begin
         fs_valid <= 1'b0;
     end
     else if (fs_allowin) begin
-        fs_valid <= to_fs_valid & ~exc_flush;
+        fs_valid <= ps_to_fs_valid & ~exc_flush;
     end
-    else if (exc_flush && !fs_allowin) begin
+    else if (!fs_allowin && exc_flush) begin
         fs_valid <= 1'b0;
     end
 
     if (reset) begin
         fs_pc <= 32'hbfbffffc;
     end
-    else if (to_fs_valid && fs_allowin) begin
+    else if (ps_to_fs_valid && fs_allowin) begin
         fs_pc <= inst_sram_addr;
     end
 end
@@ -202,17 +212,17 @@ always @(posedge clk) begin
         fs_exc_flush_r <= 1'b0;
     end
 end
-// ir_shkhd: hands shaked and not recv yet
+// fs_addr_ok_r: hands shaked and not recv yet
 always @(posedge clk) begin
     if (reset) begin
-        ir_shkhd <= 1'b0;
+        fs_addr_ok_r <= 1'b0;
     end
-    else if (inst_sram_req && inst_sram_addr_ok) begin
-        ir_shkhd <= 1'b1;
+    else if (fs_addr_ok) begin
+        fs_addr_ok_r <= 1'b1;
     end
-    else if (ir_shkhd
+    else if (fs_addr_ok_r
           && inst_sram_data_ok) begin
-        ir_shkhd <= 1'b0;
+        fs_addr_ok_r <= 1'b0;
     end
 end
 // fs_throw: if current request should be throw
@@ -221,7 +231,7 @@ always @(posedge clk) begin
         fs_throw <= 1'b0;
     end
     else if (exc_flush) begin
-        fs_throw<= to_fs_valid
+        fs_throw<= ps_to_fs_valid
                  |~fs_allowin & ~fs_ready_go;
     end
     else if (fs_throw
@@ -251,7 +261,7 @@ always @(posedge clk) begin
     if (reset) begin
         br_buf_valid <= 1'b0;
     end
-    else if (br_taken && to_fs_ready_go && fs_allowin) begin
+    else if (br_taken && ps_ready_go && fs_allowin) begin
         br_buf_valid <= 1'b0;
     end
     else if (ds_to_es_valid) begin
@@ -261,7 +271,7 @@ always @(posedge clk) begin
     if (reset) begin
         br_buf <= `BR_BUS_WD'b0;
     end else if (ds_to_es_valid
-            && !(br_taken && to_fs_ready_go && fs_allowin)) begin
+            && !(br_taken && ps_ready_go && fs_allowin)) begin
         br_buf <= br_bus;
     end
 end
@@ -271,11 +281,11 @@ always @(posedge clk) begin
     if (reset) begin
         npc_buf_valid <= 1'b0;
     end
-    else if (to_fs_valid && fs_allowin) begin
-    // invalid as an assignment to fs_pc just finished
+    else if (ps_to_fs_valid && fs_allowin) begin
+    //? invalid as an assignment to fs_pc just finished
         npc_buf_valid <= 1'b0;
     end
-    else if (!npc_buf_valid) begin
+    else if (exc_flush || !fs_exc_flush_r) begin
         npc_buf_valid <= 1'b1;
     end
 
