@@ -1,25 +1,25 @@
 `include "mycpu.h"
 
 module mem_stage(
-    input                          clk           ,
-    input                          reset         ,
+    input                          clk              ,
+    input                          reset            ,
     //allowin
-    input                          ws_allowin    ,
-    output                         ms_allowin    ,
+    input                          ws_allowin       ,
+    output                         ms_allowin       ,
     //from es
-    input                          es_to_ms_valid,
-    input  [`ES_TO_MS_BUS_WD -1:0] es_to_ms_bus  ,
+    input                          es_to_ms_valid   ,
+    input  [`ES_TO_MS_BUS_WD -1:0] es_to_ms_bus     ,
     //to ws
-    output                         ms_to_ws_valid,
-    output [`MS_TO_WS_BUS_WD -1:0] ms_to_ws_bus  ,
+    output                         ms_to_ws_valid   ,
+    output [`MS_TO_WS_BUS_WD -1:0] ms_to_ws_bus     ,
     // to ds
-    output [`MS_TO_DS_BUS_WD -1:0] ms_to_ds_bus  ,
+    output [`MS_TO_DS_BUS_WD -1:0] ms_to_ds_bus     ,
     // flush
-    input                          exc_flush,
-    output                         ms_ex    ,
+    input                          exc_flush        ,
+    output                         ms_ex            ,
     //from data-sram
-    input         data_sram_data_ok,
-    input  [31:0] data_sram_rdata
+    input                          data_sram_data_ok,
+    input  [31:0]                  data_sram_rdata
 );
 
 /*  DECLARATION  */
@@ -45,9 +45,6 @@ wire [31:0] ms_final_result;
 wire [31:0] ms_badvaddr;
 
 wire ms_mems_fi;
-
-wire ms_flush;
-wire es_flush;
 
 wire ms_bd;
 wire ms_res_valid;
@@ -84,37 +81,35 @@ wire ms_exc_adel_ld;
 wire ms_exc_ades;
 wire ms_exc_of;
 
-wire [31:0] mdata_now;
-
-reg  [31:0] mdata_buf;
-
 reg         mdata_buf_valid;
+
+wire [31:0] mdata_now;
+reg  [31:0] mdata_buf;
 
 
 /*  LOGIC  */
 
-assign {ms_exc_of      , //162
-        ms_badvaddr    , //161:130
-        ms_exc_ades    , //129
-        ms_exc_adel_ld , //128
-        ms_exc_adel_if , //127
-        ms_exc_ri      , //126
-        ms_exc_bp      , //125
-        es_flush       , //124
-        ms_bd          , //123
-        ms_inst_eret   , //122
-        ms_exc_sysc    , //121
-        ms_inst_mfc0   , //120
-        ms_inst_mtc0   , //119
-        ms_sel         , //118:116
-        ms_rd          , //115:111
-        ms_rt_value    , //110:79
-        ms_lad         , //78:77
-        ms_ls_type     , //76:71
-        ms_mem_re      , //70:70
-        ms_gpr_we      , //69:69
-        ms_dest        , //68:64
-        ms_alu_result  , //63:32
+assign {ms_exc_of      , //161
+        ms_exc_ades    , //160
+        ms_exc_adel_ld , //159
+        ms_exc_adel_if , //158
+        ms_exc_ri      , //157
+        ms_exc_bp      , //156
+        ms_inst_eret   , //155
+        ms_exc_sysc    , //154
+        ms_inst_mfc0   , //153
+        ms_inst_mtc0   , //152
+        ms_bd          , //151
+        ms_sel         , //150:148
+        ms_rd          , //147:143
+        ms_rt_value    , //142:111
+        ms_lad         , //110:109
+        ms_ls_type     , //108:103
+        ms_mem_re      , //102
+        ms_gpr_we      , //101
+        ms_dest        , //100:96
+        ms_alu_result  , //95:64
+        ms_badvaddr    , //63:32
         ms_pc            //31:0
        } = es_to_ms_bus_r;
 
@@ -122,38 +117,41 @@ assign ms_mem_we = (|ms_ls_type) & ~ms_mem_re; //store
 
 assign ms_res_valid =~ms_inst_mfc0
                     & ms_to_ws_valid;
-assign ms_flush     = exc_flush;
 
-assign ms_to_ws_bus = {ms_exc_of      , //121
-                       ms_badvaddr    , //120:89
-                       ms_exc_ades    , //88
-                       ms_exc_adel_if , //87
-                       ms_exc_adel_ld , //86
-                       ms_exc_ri      , //85
-                       ms_exc_bp      , //84
-                       ms_flush       , //83
-                       ms_bd          , //82
-                       ms_inst_eret   , //81
-                       ms_exc_sysc    , //80
-                       ms_inst_mfc0   , //79
-                       ms_inst_mtc0   , //78
-                       ms_sel         , //77:75
-                       ms_rd          , //74:70
-                       ms_gpr_we      , //69:69
-                       ms_dest        , //68:64
-                       ms_final_result, //63:32
+assign ms_to_ws_bus = {ms_exc_of      , //120
+                       ms_exc_ades    , //119
+                       ms_exc_adel_if , //118
+                       ms_exc_adel_ld , //117
+                       ms_exc_ri      , //116
+                       ms_exc_bp      , //115
+                       ms_inst_eret   , //114
+                       ms_exc_sysc    , //113
+                       ms_inst_mfc0   , //112
+                       ms_inst_mtc0   , //111
+                       ms_bd          , //110
+                       ms_sel         , //109:107
+                       ms_rd          , //106:102
+                       ms_gpr_we      , //101
+                       ms_dest        , //100:96
+                       ms_final_result, //95:64
+                       ms_badvaddr    , //63:32
                        ms_pc            //31: 0
                       };
 
-assign ms_ex = (ms_exc_of      || ms_exc_sysc || ms_exc_ri || ms_exc_bp ||
-                ms_exc_adel_if || ms_exc_adel_ld || ms_exc_ades || ms_inst_eret) && ms_valid;
+assign ms_ex =(ms_exc_of
+             | ms_exc_sysc
+             | ms_exc_ri
+             | ms_exc_bp
+             | ms_exc_adel_if
+             | ms_exc_adel_ld
+             | ms_exc_ades
+             | ms_inst_eret) & ms_valid;
 
-assign ms_to_ds_bus = {`MS_TO_DS_BUS_WD{ ms_valid
-                                       & ms_gpr_we
-                                       }} & {ms_res_valid,    // 37
-                                             ms_dest,         // 36:32
-                                             ms_final_result  // 31: 0
-                                             };
+assign ms_to_ds_bus = {`MS_TO_DS_BUS_WD{ ms_valid & ms_gpr_we}}
+                    & {ms_res_valid,    // 37
+                       ms_dest,         // 36:32
+                       ms_final_result  // 31: 0
+                      };
 
 assign ms_mems_fi = data_sram_data_ok && ws_allowin
                   ||mdata_buf_valid

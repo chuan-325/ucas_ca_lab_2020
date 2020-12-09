@@ -1,23 +1,23 @@
 `include "mycpu.h"
 
 module wb_stage(
-    input                           clk           ,
-    input                           reset         ,
+    input                           clk             ,
+    input                           reset           ,
     //allowin
-    output                          ws_allowin    ,
+    output                          ws_allowin      ,
     //from ms
-    input                           ms_to_ws_valid,
-    input  [`MS_TO_WS_BUS_WD -1:0]  ms_to_ws_bus  ,
+    input                           ms_to_ws_valid  ,
+    input  [`MS_TO_WS_BUS_WD -1:0]  ms_to_ws_bus    ,
     //to rf: for write back
-    output [`WS_TO_RF_BUS_WD -1:0]  ws_to_rf_bus  ,
+    output [`WS_TO_RF_BUS_WD -1:0]  ws_to_rf_bus    ,
     // flush
-    output                          exc_flush     ,
-    output [31:0]                   ws_pc_gen_exc ,
+    output                          exc_flush       ,
+    output [31:0]                   ws_pc_gen_exc   ,
     //trace debug interface
-    output [31:0] debug_wb_pc     ,
-    output [ 3:0] debug_wb_rf_wen ,
-    output [ 4:0] debug_wb_rf_wnum,
-    output [31:0] debug_wb_rf_wdata
+    output [31:0]                   debug_wb_pc     ,
+    output [ 3:0]                   debug_wb_rf_wen ,
+    output [ 4:0]                   debug_wb_rf_wnum,
+    output [31:0]                   debug_wb_rf_wdata
 );
 
 /*  DECLARATION  */
@@ -37,8 +37,6 @@ wire        rf_we;
 wire [4 :0] rf_waddr;
 wire [31:0] rf_wdata;
 
-wire ws_flush;
-wire ms_flush;
 wire ws_cp0_valid;
 
 wire ws_inst_mtc0;
@@ -70,30 +68,27 @@ wire [31:0] ws_badvaddr;
 
 /*  LOGIC  */
 
-assign {ws_exc_of      , //121
-        ws_badvaddr    , //120:89
-        ws_exc_ades    , //88
-        ws_exc_adel_if , //87
-        ws_exc_adel_ld , //86
-        ws_exc_ri      , //85
-        ws_exc_bp      , //84
-        ms_flush       , //83
-        ws_bd          , //82
-        ws_inst_eret   , //81
-        ws_exc_sysc    , //80
-        ws_inst_mfc0   , //79
-        ws_inst_mtc0   , //78
-        ws_sel         , //77:75
-        ws_rd          , //74:70
-        ws_gpr_we      , //69:69
-        ws_dest        , //68:64
-        ws_final_result, //63:32
+assign {ws_exc_of      , //120
+        ws_exc_ades    , //119
+        ws_exc_adel_if , //118
+        ws_exc_adel_ld , //117
+        ws_exc_ri      , //116
+        ws_exc_bp      , //115
+        ws_inst_eret   , //114
+        ws_exc_sysc    , //113
+        ws_inst_mfc0   , //112
+        ws_inst_mtc0   , //111
+        ws_bd          , //110
+        ws_sel         , //109:107
+        ws_rd          , //106:102
+        ws_gpr_we      , //101
+        ws_dest        , //100:96
+        ws_final_result, //95:64
+        ws_badvaddr    , //63:32
         ws_pc            //31:0
        } = ms_to_ws_bus_r;
 
-assign ws_gpr_we_t = ws_gpr_we & ~ws_flush;
-
-assign ws_flush = exc_flush;
+assign ws_gpr_we_t = ws_gpr_we & ~exc_flush;
 
 assign ws_to_rf_bus = {rf_we   ,  //37:37
                        rf_waddr,  //36:32 dest
@@ -121,7 +116,7 @@ assign rf_waddr = {5{ws_valid}} & ws_dest;
 assign rf_wdata = ws_inst_mfc0 ? ws_c0_rdata
                                : ws_final_result;
 
-assign ws_cp0_valid = ws_valid & ~ws_flush;
+assign ws_cp0_valid = ws_valid & ~exc_flush;
 assign ws_ex =( ws_exc_intr
               | ws_exc_sysc
               | ws_exc_bp

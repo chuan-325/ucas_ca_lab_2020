@@ -37,9 +37,6 @@ wire [31:0] ds_pc  ;
 
 wire [31:0] ds_badvaddr;
 
-wire ds_flush;
-wire fs_flush;
-
 reg  ds_bd;
 
 wire        rf_we   ;
@@ -217,12 +214,11 @@ wire inst_jnr;
 
 assign fs_pc = fs_to_ds_bus[31:0];
 
-assign {ds_badvaddr , //97:66
-        exc_adel_if , //65
-        fs_flush    , //64
+assign {ds_badvaddr , //96:65
+        exc_adel_if , //64
         ds_inst     , //63:32
         ds_pc         //31:0
-        } = fs_to_ds_bus_r;
+       } = fs_to_ds_bus_r;
 
 assign {rf_we   , //37:37
         rf_waddr, //36:32
@@ -247,44 +243,42 @@ assign br_bus = {ds_to_es_valid, //34
                  br_target //31:0
                  };
 
-assign ds_to_es_bus = {ds_of_valid,  //199
-                       ds_badvaddr,  //198:167
-                       exc_adel_if,  //166
-                       exc_ri     ,  //165
-                       inst_bp    ,  //164
-                       ds_flush   ,  //163
-                       ds_bd      ,  //162
-                       inst_eret  ,  //161
-                       inst_sysc  ,  //160
-                       inst_mfc0  ,  //159
-                       inst_mtc0  ,  //158
-                       sel        ,  //157:155
-                       rd         ,  //154:150
-                       ls_type    ,  //149:144
-                       inst_mtlo  ,  //143     | op
-                       inst_mthi  ,  //142
-                       inst_mflo  ,  //141
-                       inst_mfhi  ,  //140
-                       inst_divu  ,  //139
-                       inst_div   ,  //138
-                       inst_multu ,  //137
-                       inst_mult  ,  //136
-                       alu_op     ,  //135:124
-                       mem_re     ,  //123:123
-                       src1_is_sa ,  //122:122  | src
-                       src1_is_pc ,  //121:121
-                       src2_is_imm,  //120:120
-                       src2_is_8  ,  //119:119
-                       gpr_we     ,  //118:118  | we
-                       mem_we     ,  //117:117
-                       dest       ,  //116:112  | val
-                       imm        ,  //111:96
-                       rs_value   ,  //95 :64
-                       rt_value   ,  //63 :32
-                       ds_pc         //31 :0
+assign ds_to_es_bus = {ds_of_valid,  //198
+                       exc_adel_if,  //197
+                       exc_ri     ,  //196
+                       inst_bp    ,  //195
+                       inst_eret  ,  //194
+                       inst_sysc  ,  //193
+                       inst_mfc0  ,  //192
+                       inst_mtc0  ,  //191
+                       ds_bd      ,  //190
+                       sel        ,  //189:187
+                       rd         ,  //186:182
+                       ls_type    ,  //181:176
+                       inst_mtlo  ,  //175
+                       inst_mthi  ,  //174
+                       inst_mflo  ,  //173
+                       inst_mfhi  ,  //172
+                       inst_divu  ,  //171
+                       inst_div   ,  //170
+                       inst_multu ,  //169
+                       inst_mult  ,  //168
+                       alu_op     ,  //167:156
+                       mem_re     ,  //155
+                       src1_is_sa ,  //154
+                       src1_is_pc ,  //153
+                       src2_is_imm,  //152
+                       src2_is_8  ,  //151
+                       gpr_we     ,  //150
+                       mem_we     ,  //149
+                       dest       ,  //148:144
+                       imm        ,  //143:128
+                       rs_value   ,  //127:96
+                       rt_value   ,  //95:64
+                       ds_badvaddr,  //63:32
+                       ds_pc         //31:0
                       };
 
-assign ds_flush       = exc_flush;
 assign ds_allowin     = !ds_valid
                       || ds_ready_go & es_allowin;
 assign ds_to_es_valid = ds_valid && ds_ready_go;

@@ -18,13 +18,13 @@ module exe_stage(
     input                          exc_flush      ,
     input                          ms_ex          ,
     // data sram interface
-    output  reg   data_sram_req,
-    output        data_sram_wr,
-    output [ 1:0] data_sram_size,
-    output [31:0] data_sram_addr,
-    output [ 3:0] data_sram_wstrb,
-    output [31:0] data_sram_wdata,
-    input         data_sram_addr_ok //in
+    output  reg                    data_sram_req  ,
+    output                         data_sram_wr   ,
+    output [ 1:0]                  data_sram_size ,
+    output [31:0]                  data_sram_addr ,
+    output [ 3:0]                  data_sram_wstrb,
+    output [31:0]                  data_sram_wdata,
+    input                          data_sram_addr_ok //in
 );
 
 /*  DECLARATION  */
@@ -72,8 +72,6 @@ wire [31:0] es_pc         ;
 wire es_divs_fi;
 wire es_mems_fi;
 
-wire es_flush;
-wire ds_flush;
 wire es_ignore;
 wire es_ex;
 wire es_bd;
@@ -148,41 +146,40 @@ reg dr_shkhd;
 
 /*  LOGIC  */
 
-assign {es_of_valid    ,  //199
-        ds_badvaddr    ,  //198:167
-        es_exc_adel_if ,  //166
-        es_exc_ri      ,  //165
-        es_exc_bp      ,  //164
-        ds_flush       ,  //163
-        es_bd          ,  //162
-        es_inst_eret   ,  //161
-        es_exc_sysc    ,  //160
-        es_inst_mfc0   ,  //159
-        es_inst_mtc0   ,  //158
-        es_sel         ,  //157:155
-        es_rd          ,  //154:150
-        es_ls_type     ,  //149:144
-        es_inst_mtlo   ,  //143
-        es_inst_mthi   ,  //142
-        es_inst_mflo   ,  //141
-        es_inst_mfhi   ,  //140
-        es_op_divu     ,  //139
-        es_op_div      ,  //138
-        es_op_multu    ,  //137
-        es_op_mult     ,  //136
-        es_alu_op      ,  //135:124
-        es_mem_re      ,  //123:123
-        es_src1_is_sa  ,  //122:122
-        es_src1_is_pc  ,  //121:121
-        es_src2_is_imm ,  //120:120
-        es_src2_is_8   ,  //119:119
-        es_gpr_we      ,  //118:118
-        es_mem_we      ,  //117:117
-        es_dest        ,  //116:112
-        es_imm         ,  //111:96
-        es_rs_value    ,  //95 :64
-        es_rt_value    ,  //63 :32
-        es_pc             //31 :0
+assign {es_of_valid    ,  //198
+        es_exc_adel_if ,  //197
+        es_exc_ri      ,  //196
+        es_exc_bp      ,  //195
+        es_inst_eret   ,  //194
+        es_exc_sysc    ,  //193
+        es_inst_mfc0   ,  //192
+        es_inst_mtc0   ,  //191
+        es_bd          ,  //190
+        es_sel         ,  //189:187
+        es_rd          ,  //186:182
+        es_ls_type     ,  //181:176
+        es_inst_mtlo   ,  //175
+        es_inst_mthi   ,  //174
+        es_inst_mflo   ,  //173
+        es_inst_mfhi   ,  //172
+        es_op_divu     ,  //171
+        es_op_div      ,  //170
+        es_op_multu    ,  //169
+        es_op_mult     ,  //168
+        es_alu_op      ,  //167:156
+        es_mem_re      ,  //155
+        es_src1_is_sa  ,  //154
+        es_src1_is_pc  ,  //153
+        es_src2_is_imm ,  //152
+        es_src2_is_8   ,  //151
+        es_gpr_we      ,  //150
+        es_mem_we      ,  //149
+        es_dest        ,  //148:144
+        es_imm         ,  //143:128
+        es_rs_value    ,  //127:96
+        es_rt_value    ,  //95:64
+        ds_badvaddr    ,  //63:32
+        es_pc             //31:0
        } = ds_to_es_bus_r;
 
 
@@ -202,7 +199,6 @@ assign es_lad_d[2] = (es_lad==2'b10);
 assign es_lad_d[1] = (es_lad==2'b01);
 assign es_lad_d[0] = (es_lad==2'b00);
 
-assign es_flush = exc_flush;
 assign es_ex    = es_inst_eret
                 | es_exc_adel_if
                 | es_exc_ri
@@ -215,37 +211,35 @@ assign es_ex    = es_inst_eret
 assign es_res_valid = ~es_mem_re
                     & ~es_inst_mfc0;
 
-assign es_to_ms_bus = {es_exc_of     , //162
-                       es_badvaddr   , //161:130
-                       es_exc_ades   , //129
-                       es_exc_adel_ld, //128
-                       es_exc_adel_if, //127
-                       es_exc_ri     , //126
-                       es_exc_bp     , //125
-                       es_flush      , //124
-                       es_bd         , //123
-                       es_inst_eret  , //122
-                       es_exc_sysc   , //121
-                       es_inst_mfc0  , //120
-                       es_inst_mtc0  , //119
-                       es_sel        , //118:116
-                       es_rd         , //115:111
-                       es_rt_value   , //110:79
-                       es_lad        , //78:77
-                       es_ls_type    , //76:71
-                       es_mem_re     , //70:70
-                       es_gpr_we     , //69:69
-                       es_dest       , //68:64
-                       es_res_r      , //63:32 originally es_alu_result
-                       es_pc          //31:0
+assign es_to_ms_bus = {es_exc_of     , //161
+                       es_exc_ades   , //160
+                       es_exc_adel_ld, //159
+                       es_exc_adel_if, //158
+                       es_exc_ri     , //157
+                       es_exc_bp     , //156
+                       es_inst_eret  , //155
+                       es_exc_sysc   , //154
+                       es_inst_mfc0  , //153
+                       es_inst_mtc0  , //152
+                       es_bd         , //151
+                       es_sel        , //150:148
+                       es_rd         , //147:143
+                       es_rt_value   , //142:111
+                       es_lad        , //110:109
+                       es_ls_type    , //108:103
+                       es_mem_re     , //102
+                       es_gpr_we     , //101
+                       es_dest       , //100:96
+                       es_res_r      , //95:64
+                       es_badvaddr   , //63:32
+                       es_pc           //31:0
                       };
 
-assign es_to_ds_bus = {`ES_TO_DS_BUS_WD{ es_valid
-                                       & es_gpr_we
-                                       }} & {es_res_valid, //37    es_res_valid
-                                             es_dest,      //36:32 es_dest
-                                             es_res_r      //31: 0 es_res_r
-                                             };
+assign es_to_ds_bus = {`ES_TO_DS_BUS_WD{ es_valid & es_gpr_we}}
+                    & {es_res_valid, //37    es_res_valid
+                       es_dest,      //36:32 es_dest
+                       es_res_r      //31: 0 es_res_r
+                       };
 
 always @(posedge clk) begin
     if (reset) begin
