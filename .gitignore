@@ -31,3 +31,6 @@ lab11/CPU_CDE_AXI/cpu132_gettrace
 lab11/CPU_CDE_AXI/.vscode
 lab11/CPU_CDE_AXI/soft
 lab11/CPU_CDE_AXI/Readme_First.txt
+# lab 13
+lab13/tlb_verify/run_vivado
+lab13/tlb_verify/testbench
