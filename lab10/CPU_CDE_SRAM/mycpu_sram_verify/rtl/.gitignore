@@ -2,4 +2,4 @@ BRIDGE/
 CONFREG/
 ram_wrap/
 xilinx_ip/
-soc_axi_lite_top.v
+soc_sram_lite_top.v
