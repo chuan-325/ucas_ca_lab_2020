@@ -68,37 +68,162 @@ module cpu_axi_interface(
     input         bvalid      ,
     output        bready     );
 
+/* DECLARATION */
 
-/* ar: read request */
+localparam IDLE   = 2'b00;
+localparam FINISH = 2'b01;
+localparam WORK   = 2'b10;
+localparam BLOCK  = 2'b11;
+
+wire rd_req;
+wire wt_req;
+
+wire inst_rd_shkhd;
+wire data_rd_shkhd;
+wire data_wt_shkhd;
+
+reg inst_req_r;
+reg data_req_r;
 
 
+reg rd_txn;
+reg wt_txn;
+
+wire arshkhd;
+wire rshkhd;
+wire awshkhd;
+wire wshkhd;
+wire bshkhd;
+
+reg aw_shkhd_r;
+reg w_shkhd_r ;
+
+reg [1:0] FSM_ar;
+reg [1:0] FSM_r;
+reg [1:0] FSM_aww;
+reg [1:0] FSM_b;
+
+reg [ 3:0] arid_r;
+reg [31:0] araddr_r;
+reg [ 2:0] arsize_r;
+reg [31:0] awaddr_r;
+reg [ 2:0] awsize_r;
+reg [31:0] wdata_r;
+reg [ 3:0] wstrb_r;
+
+/* LOGIC */
+
+assign rd_req = inst_req & ~inst_wr
+              | data_req & ~data_wr;
+assign wt_req = data_req &  data_wr;
+
+assign inst_rd_shkhd = inst_req & inst_addr_ok ;
+assign data_rd_shkhd = data_req & data_addr_ok & ~data_wr;
+assign data_wt_shkhd = data_req & data_addr_ok &  data_wr;
+
+always @(posedge clk) begin
+    if (~resetn) begin
+        inst_req_r <= 1'b0;
+    end
+    else if (inst_rd_shkhd) begin
+        inst_req_r <= inst_req;
+    end
+end
+always @(posedge clk) begin
+    if (~resetn) begin
+        data_req_r <= 1'b0;
+    end
+    else if (data_rd_shkhd||data_wt_shkhd) begin
+        data_req_r <= data_req;
+    end
+end
+
+always @(posedge clk) begin
+    if (~resetn) begin
+        rd_txn <= 1'b0;
+    end
+    else if (!rd_txn && !wt_txn
+           && rd_req && !wt_req) begin
+        rd_txn <= 1'b1;
+    end
+    else if (rshkhd) begin
+        rd_txn <= 1'b0;
+    end
+end
+always @(posedge clk) begin
+    if (~resetn) begin
+        wt_txn <= 1'b0;
+    end
+    else if (!wt_txn && !rd_txn
+           && wt_req && !rd_req) begin
+        wt_txn <= 1'b1;
+    end
+    else if (bshkhd) begin
+        wt_txn <= 1'b0;
+    end
+end
+
+assign arshkhd = arvalid & arready;
+assign rshkhd  = rvalid  & rready ;
+assign awshkhd = awvalid & awready;
+assign wshkhd  = wvalid  & wready ;
+assign bshkhd  = bvalid  & bready ;
+
+/* OUTPUT */
+// inst sram
+assign inst_addr_ok = !rd_txn && !wt_txn && !data_req && inst_req;
+assign inst_data_ok =  inst_req_r && rd_txn && rshkhd;
+assign inst_rdata   = {32{inst_req_r}} & rdata;
+// data sram
+assign data_addr_ok = !rd_txn && !wt_txn && !inst_req && data_req;
+assign data_data_ok =  data_req_r && (rd_txn && rshkhd
+                                    ||wt_txn && bshkhd);
+assign data_rdata   = {32{data_req_r}} & rdata;
+// ar
+assign arid    = data_req;
+assign araddr  = {32{inst_req & ~inst_wr}} & inst_addr
+               | {32{data_req & ~data_wr}} & data_addr;
 assign arlen   = 8'b0;
-
+assign arsize  = {3{inst_req & ~inst_wr}} & inst_size
+               | {3{data_req & ~data_wr}} & data_size;
 assign arburst = 2'b01;
 assign arlock  = 1'b0;
 assign arcache = 4'b0;
 assign arprot  = 3'b0;
+// TODO: arvalid
 
-/* r: read response */
+// r
+// TODO: rready
 
-
-/* aw: write request */
+// aw
 assign awid    = 4'b1;
-
+assign awaddr  = {32{data_req & data_wr}} & data_addr;
 assign awlen   = 8'b0;
-
+assign awsize  = { 3{data_req & data_wr}} & data_size;
 assign awburst = 2'b01;
 assign awlock  = 1'b0;
 assign awcache = 4'b0;
 assign awprot  = 3'b0;
+// TODO: awvalid
 
-/* w: write data */
+// w
 assign wid     = 4'b1;
-
-
+assign wdata   = {32{data_req & data_wr}} & data_wdata;
+assign wstrb   = { 4{data_req & data_wr}} & data_wstrb;
 assign wlast   = 1'b1;
+// TODO: wvalid
 
-/* b: write response */
+// b
+// TODO: bready
+
+
+/* FSM */
+// TODO: ar
+// TODO: r
+// TODO: aww
+// TODO: b
+
+/* BUF */
 
 
 endmodule
