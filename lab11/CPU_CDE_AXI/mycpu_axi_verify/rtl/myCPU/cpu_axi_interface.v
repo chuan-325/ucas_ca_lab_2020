@@ -70,10 +70,8 @@ module cpu_axi_interface(
 
 /* DECLARATION */
 
-localparam IDLE   = 2'b00;
-localparam FINISH = 2'b01;
-localparam WORK   = 2'b10;
-localparam BLOCK  = 2'b11;
+localparam IDLE   = 1'b0;
+localparam WORK   = 1'b1;
 
 wire rd_req;
 wire wt_req;
@@ -95,13 +93,13 @@ wire awshkhd;
 wire wshkhd;
 wire bshkhd;
 
-reg aw_shkhd_r;
-reg w_shkhd_r ;
+reg awshkhd_r;
+reg wshkhd_r ;
 
-reg [1:0] FSM_ar;
-reg [1:0] FSM_r;
-reg [1:0] FSM_aww;
-reg [1:0] FSM_b;
+reg STATE_ar;
+reg STATE_r;
+reg STATE_aww;
+reg STATE_b;
 
 reg [ 3:0] arid_r;
 reg [31:0] araddr_r;
@@ -122,7 +120,7 @@ assign data_rd_shkhd = data_req & data_addr_ok & ~data_wr;
 assign data_wt_shkhd = data_req & data_addr_ok &  data_wr;
 
 always @(posedge clk) begin
-    if (~resetn) begin
+    if (!resetn) begin
         inst_req_r <= 1'b0;
     end
     else if (inst_rd_shkhd) begin
@@ -130,7 +128,7 @@ always @(posedge clk) begin
     end
 end
 always @(posedge clk) begin
-    if (~resetn) begin
+    if (!resetn) begin
         data_req_r <= 1'b0;
     end
     else if (data_rd_shkhd||data_wt_shkhd) begin
@@ -139,7 +137,7 @@ always @(posedge clk) begin
 end
 
 always @(posedge clk) begin
-    if (~resetn) begin
+    if (!resetn) begin
         rd_txn <= 1'b0;
     end
     else if (!rd_txn && !wt_txn
@@ -151,7 +149,7 @@ always @(posedge clk) begin
     end
 end
 always @(posedge clk) begin
-    if (~resetn) begin
+    if (!resetn) begin
         wt_txn <= 1'b0;
     end
     else if (!wt_txn && !rd_txn
@@ -180,21 +178,17 @@ assign data_data_ok =  data_req_r && (rd_txn && rshkhd
                                     ||wt_txn && bshkhd);
 assign data_rdata   = {32{data_req_r}} & rdata;
 // ar
-assign arid    = data_req;
-assign araddr  = {32{inst_req & ~inst_wr}} & inst_addr
-               | {32{data_req & ~data_wr}} & data_addr;
+assign arid    = arid_r;
+assign araddr  = araddr_r;
 assign arlen   = 8'b0;
-assign arsize  = {3{inst_req & ~inst_wr}} & inst_size
-               | {3{data_req & ~data_wr}} & data_size;
+assign arsize  = arsize_r;
 assign arburst = 2'b01;
 assign arlock  = 1'b0;
 assign arcache = 4'b0;
 assign arprot  = 3'b0;
-// TODO: arvalid
-
+assign arvalid = (STATE_ar == IDLE) && rd_txn;
 // r
-// TODO: rready
-
+assign rready  = (STATE_ar == WORK) && rd_txn;
 // aw
 assign awid    = 4'b1;
 assign awaddr  = {32{data_req & data_wr}} & data_addr;
@@ -204,26 +198,119 @@ assign awburst = 2'b01;
 assign awlock  = 1'b0;
 assign awcache = 4'b0;
 assign awprot  = 3'b0;
-// TODO: awvalid
-
+assign awvalid = !awshkhd_r && wt_txn;
 // w
 assign wid     = 4'b1;
 assign wdata   = {32{data_req & data_wr}} & data_wdata;
 assign wstrb   = { 4{data_req & data_wr}} & data_wstrb;
 assign wlast   = 1'b1;
-// TODO: wvalid
-
+assign wvalid  = !wshkhd && wt_txn;
 // b
-// TODO: bready
-
+assign bready  = (STATE_aww == WORK) && wt_txn;
 
 /* FSM */
-// TODO: ar
-// TODO: r
-// TODO: aww
-// TODO: b
+// ar
+always @(posedge clk) begin
+    if (!resetn) begin
+        STATE_ar <= IDLE;
+    end
+    else if (arshkhd && (STATE_ar == IDLE)) begin
+        STATE_ar <= WORK;
+    end
+    else if (rshkhd && (STATE_ar == WORK)) begin
+        STATE_ar <= IDLE;
+    end
+end
+// r
+always @(posedge clk) begin
+    if (!resetn) begin
+        STATE_r <= IDLE;
+    end
+    else if (rshkhd) begin
+        STATE_r <= WORK;
+    end
+    else if (arshkhd) begin
+        STATE_r <= IDLE;
+    end
+end
+// aww
+always @(posedge clk) begin
+    if (!resetn) begin
+        STATE_aww <= IDLE;
+    end
+    else if (awshkhd||wshkhd) begin
+        STATE_aww <= WORK;
+    end
+    else if (bshkhd) begin
+        STATE_aww <= IDLE;
+    end
+
+    if (!resetn) begin
+        awshkhd_r <= 1'b0;
+        wshkhd_r  <= 1'b0;
+    end
+    else if (awshkhd||wshkhd) begin
+        awshkhd_r <= awshkhd;
+        wshkhd_r  <= wshkhd;
+    end
+    else if (bshkhd) begin
+        awshkhd_r <= 1'b0;
+        wshkhd_r  <= 1'b0;
+    end
+end
+// b
+always @(posedge clk) begin
+    if (!resetn) begin
+        STATE_b <= IDLE;
+    end
+    else if (wlast && wshkhd) begin
+        STATE_b <= WORK;
+    end
+    else if (bshkhd) begin
+        STATE_b <= IDLE;
+    end
+end
 
 /* BUF */
-
+// ar
+always @(posedge clk) begin
+    if (!resetn) begin
+        arid_r   <=  4'b0;
+        araddr_r <= 32'b0;
+        arsize_r <=  3'b0;
+    end
+    else if (inst_rd_shkhd) begin
+        arid_r   <= 4'b0;
+        araddr_r <= inst_addr;
+        arsize_r <= inst_size;
+    end
+    else if (data_rd_shkhd) begin
+        arid_r   <= 4'b1;
+        araddr_r <= data_addr;
+        arsize_r <= data_size;
+    end
+end
+// aw
+always @(posedge clk) begin
+    if (!resetn) begin
+        awaddr_r <= 32'b0;
+        awsize_r <=  3'b0;
+    end
+    else if (data_wt_shkhd) begin
+        awaddr_r <= data_addr;
+        awsize_r <= data_size;
+    end
+end
+// w
+always @(posedge clk) begin
+    if (!resetn) begin
+        wdata_r <= 32'b0;
+        wstrb_r <=  4'b0;
+    end
+    else if (data_wt_shkhd) begin
+        wdata_r <= data_wdata;
+        wstrb_r <= data_wstrb;
+    end
+end
 
 endmodule
