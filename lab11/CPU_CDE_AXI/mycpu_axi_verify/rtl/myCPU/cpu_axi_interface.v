@@ -75,39 +75,34 @@ localparam WORK   = 1'b1;
 
 wire rd_req;
 wire wt_req;
-
 wire inst_rd_shkhd;
 wire data_rd_shkhd;
 wire data_wt_shkhd;
+reg  inst_req_r;
+reg  data_req_r;
 
-reg inst_req_r;
-reg data_req_r;
+reg  rd_txn   ; // txn = transaction
+reg  wt_txn   ;
+wire arshkhd  ;
+wire rshkhd   ;
+wire awshkhd  ;
+wire wshkhd   ;
+wire bshkhd   ;
+reg  awshkhd_r;
+reg  wshkhd_r ;
 
+reg  STATE_ar ;
+reg  STATE_r  ;
+reg  STATE_aww;
+reg  STATE_b  ;
 
-reg rd_txn;
-reg wt_txn;
-
-wire arshkhd;
-wire rshkhd;
-wire awshkhd;
-wire wshkhd;
-wire bshkhd;
-
-reg awshkhd_r;
-reg wshkhd_r ;
-
-reg STATE_ar;
-reg STATE_r;
-reg STATE_aww;
-reg STATE_b;
-
-reg [ 3:0] arid_r;
+reg [ 3:0] arid_r  ;
 reg [31:0] araddr_r;
 reg [ 2:0] arsize_r;
 reg [31:0] awaddr_r;
 reg [ 2:0] awsize_r;
-reg [31:0] wdata_r;
-reg [ 3:0] wstrb_r;
+reg [31:0] wdata_r ;
+reg [ 3:0] wstrb_r ;
 
 /* LOGIC */
 
@@ -118,23 +113,6 @@ assign wt_req = data_req &  data_wr;
 assign inst_rd_shkhd = inst_req & inst_addr_ok ;
 assign data_rd_shkhd = data_req & data_addr_ok & ~data_wr;
 assign data_wt_shkhd = data_req & data_addr_ok &  data_wr;
-
-always @(posedge clk) begin
-    if (!resetn) begin
-        inst_req_r <= 1'b0;
-    end
-    else if (inst_rd_shkhd) begin
-        inst_req_r <= inst_req;
-    end
-end
-always @(posedge clk) begin
-    if (!resetn) begin
-        data_req_r <= 1'b0;
-    end
-    else if (data_rd_shkhd||data_wt_shkhd) begin
-        data_req_r <= data_req;
-    end
-end
 
 always @(posedge clk) begin
     if (!resetn) begin
@@ -272,6 +250,22 @@ always @(posedge clk) begin
 end
 
 /* BUF */
+always @(posedge clk) begin
+    if (!resetn) begin
+        inst_req_r <= 1'b0;
+    end
+    else if (inst_rd_shkhd) begin
+        inst_req_r <= inst_req;
+    end
+end
+always @(posedge clk) begin
+    if (!resetn) begin
+        data_req_r <= 1'b0;
+    end
+    else if (data_rd_shkhd||data_wt_shkhd) begin
+        data_req_r <= data_req;
+    end
+end
 // ar
 always @(posedge clk) begin
     if (!resetn) begin
