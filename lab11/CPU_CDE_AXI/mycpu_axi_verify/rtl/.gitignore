@@ -2,4 +2,4 @@ axi_wrap/
 CONFREG/
 ram_wrap/
 xilinx_ip/
-soc_axi_lite_top.v
+#soc_axi_lite_top.v

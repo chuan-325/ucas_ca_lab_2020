@@ -1,5 +1,5 @@
 `include "mycpu.h"
-module mycpu_top(
+module mycpu_core(
     input         clk,
     input         resetn,
     // inst sram interface
