@@ -2,7 +2,7 @@ module cpu_axi_interface(
     input         clk         ,
     input         resetn      ,
 
-    /* interact with mycpu */
+    /* as slave to mycpu */
     // inst sram
     input         inst_req    ,
     input         inst_wr     ,
@@ -24,7 +24,7 @@ module cpu_axi_interface(
     output        data_data_ok,
     output [31:0] data_rdata  ,
 
-    /* interact with axi */
+    /* as master to axi crossbar */
     // ar: read request
     output [ 3:0] arid        ,
     output [31:0] araddr      ,
@@ -110,7 +110,7 @@ assign rd_req = inst_req & ~inst_wr
               | data_req & ~data_wr;
 assign wt_req = data_req &  data_wr;
 
-assign inst_rd_shkhd = inst_req & inst_addr_ok ;
+assign inst_rd_shkhd = inst_req & inst_addr_ok & ~inst_wr;
 assign data_rd_shkhd = data_req & data_addr_ok & ~data_wr;
 assign data_wt_shkhd = data_req & data_addr_ok &  data_wr;
 
@@ -273,15 +273,15 @@ always @(posedge clk) begin
         araddr_r <= 32'b0;
         arsize_r <=  3'b0;
     end
-    else if (inst_rd_shkhd) begin
-        arid_r   <= 4'b0;
-        araddr_r <= inst_addr;
-        arsize_r <= inst_size;
-    end
     else if (data_rd_shkhd) begin
         arid_r   <= 4'b1;
         araddr_r <= data_addr;
         arsize_r <= data_size;
+    end
+    else if (inst_rd_shkhd) begin
+        arid_r   <= 4'b0;
+        araddr_r <= inst_addr;
+        arsize_r <= inst_size;
     end
 end
 // aw
