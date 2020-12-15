@@ -28,6 +28,7 @@ module mycpu_core(
     output [ 4:0] debug_wb_rf_wnum,
     output [31:0] debug_wb_rf_wdata
 );
+
 reg         reset;
 always @(posedge clk) reset <= ~resetn;
 
