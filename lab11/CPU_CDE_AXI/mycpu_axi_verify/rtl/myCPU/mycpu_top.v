@@ -57,18 +57,18 @@ wire        ms_ex;
 
 // IF stage
 if_stage if_stage(
-    .clk            (clk                ),
-    .reset          (reset              ),
+    .clk             (clk               ),
+    .reset           (reset             ),
     //allowin
-    .ds_allowin     (ds_allowin         ),
+    .ds_allowin      (ds_allowin        ),
     //brbus
-    .br_bus         (br_bus             ),
+    .br_bus          (br_bus            ),
     //outputs
-    .fs_to_ds_valid (fs_to_ds_valid     ),
-    .fs_to_ds_bus   (fs_to_ds_bus       ),
+    .fs_to_ds_valid  (fs_to_ds_vali     ),
+    .fs_to_ds_bus    (fs_to_ds_bus      ),
     //flush
-    .ws_pc_gen_exc  (ws_pc_gen_exc      ),
-    .exc_flush      (exc_flush          ),
+    .ws_pc_gen_exc   (ws_pc_gen_exc     ),
+    .exc_flush       (exc_flush         ),
     // inst sram interface
     .inst_sram_req    (inst_sram_req    ),
     .inst_sram_wr     (inst_sram_wr     ),
