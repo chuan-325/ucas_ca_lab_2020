@@ -105,83 +105,50 @@ wire [ 2:0] data_size_t;
 
 
 /**************** LOGIC ****************/
-/*
- * [ar] addr, size, valid-ready
- * [ r] id, rdata, valid-ready
- * [aw] addr, size, valid-ready
- * [ w] wdata, strb, valid-ready
- * [ b] valid-ready
- */
-
 
 /**** OUTPUT ****/
 // inst sram
-//*assign inst_addr_ok = ;
+assign inst_addr_ok = !state_ar && inst_rd_req && !data_rd_req;
 //*assign inst_data_ok = ;
 //*assign inst_rdata   = ;
 // data sram
-//*assign data_addr_ok = ;
+assign data_addr_ok = data_rd_req && !state_ar
+                    ||data_wt_req && !state_aw && !state_w;
 //*assign data_data_ok = ;
 //*assign data_rdata   = ;
 // ar
-//*assign arid    = ;
-//*assign araddr  = ;
+assign arid    = arid_r;
+assign araddr  = araddr_r;
 assign arlen   = 8'b0;
-//*assign arsize  = ;
+assign arsize  = arsize_r;
 assign arburst = 2'b01;
 assign arlock  = 1'b0;
 assign arcache = 4'b0;
 assign arprot  = 3'b0;
-//*assign arvalid = ;
+assign arvalid = state_ar;
 // r
 //*assign rready  = ;
 // aw
 assign awid    = 4'b1;
-//!assign awaddr  = {32{data_req & data_wr}} & data_addr;
+assign awaddr  = awaddr_r;
 assign awlen   = 8'b0;
-//!assign awsize  = { 3{data_req & data_wr}} & data_size;
+assign awsize  = awsize_r;
 assign awburst = 2'b01;
 assign awlock  = 1'b0;
 assign awcache = 4'b0;
 assign awprot  = 3'b0;
-//*assign awvalid = ;
+assign awvalid = state_aw;
 // w
 assign wid     = 4'b1;
-//*assign wdata   = ;
-//*assign wstrb   = ;
+assign wdata   = wdata_r;
+assign wstrb   = wstrb_r;
 assign wlast   = 1'b1;
-//*assign wvalid  = ;
+assign wvalid  = state_w;
 // b
 //*assign bready  = ;
 
-/**** SRAM SLAVE (from CPU-core) ****/
-
-// READ
-//   inst sram
-
-//   data sram
-
-
-// WRITE (data sram)
-
-
-
-
-/**** AXI MASTER (to AXI-slave) ****/
 // READ
 //   ar
-
-//    r
-
-// WRITE
-//   aw
-
-//    w
-
-//    b
-
-
-// STATE machines
 always @(posedge clk) begin
     if (!resetn) begin
         state_ar <= IDLE;
@@ -208,6 +175,10 @@ always @(posedge clk) begin
         arsize_r <= 3'b0;
     end
 end
+//    r
+
+// WRITE
+//   aw/w
 always @(posedge clk) begin
     if (!resetn) begin
         state_aw <= IDLE;
@@ -241,6 +212,8 @@ always @(posedge clk) begin
         wstrb_r <= 4'b0;
     end
 end
+//    b
+
 
 // CONVENIENCE
 assign inst_rd_req = inst_req    & ~inst_wr;
@@ -251,10 +224,11 @@ assign data_rd_rcv = data_rd_req &  data_addr_ok;
 assign data_wt_rcv = data_wt_req &  data_addr_ok;
 
 /*
- |  _size  |  _size_t  |  byte  |
- |     00  |      001  |     1  |
- |     01  |      010  |     2  |
- |     10  |      100  |     4  |
+ | _size | _size_t | byte |
+ |-------|---------|------|
+ |    00 |     001 |    1 |
+ |    01 |     010 |    2 |
+ |    10 |     100 |    4 |
 */
 assign inst_size_t = {inst_size, ~|inst_size};
 assign data_size_t = {data_size, ~|data_size};
