@@ -109,13 +109,13 @@ wire [ 2:0] data_size_t;
 /**** OUTPUT ****/
 // inst sram
 assign inst_addr_ok = !state_ar && inst_rd_req && !data_rd_req;
-//*assign inst_data_ok = ;
-//*assign inst_rdata   = ;
+assign inst_data_ok =  state_ar && rready && !rid[0];
+assign inst_rdata   =  rdata;
 // data sram
 assign data_addr_ok = data_rd_req && !state_ar
                     ||data_wt_req && !state_aw && !state_w;
-//*assign data_data_ok = ;
-//*assign data_rdata   = ;
+assign data_data_ok = state_ar && rready && rid[0];
+assign data_rdata   = rdata;
 // ar
 assign arid    = arid_r;
 assign araddr  = araddr_r;
@@ -127,7 +127,7 @@ assign arcache = 4'b0;
 assign arprot  = 3'b0;
 assign arvalid = state_ar;
 // r
-//*assign rready  = ;
+assign rready  = rvalid;
 // aw
 assign awid    = 4'b1;
 assign awaddr  = awaddr_r;
@@ -145,10 +145,10 @@ assign wstrb   = wstrb_r;
 assign wlast   = 1'b1;
 assign wvalid  = state_w;
 // b
-//*assign bready  = ;
+assign bready  = bvalid;
 
+/**** State Machine ****/
 // READ
-//   ar
 always @(posedge clk) begin
     if (!resetn) begin
         state_ar <= IDLE;
@@ -177,7 +177,6 @@ always @(posedge clk) begin
 end
 
 // WRITE
-//   aw/w
 always @(posedge clk) begin
     if (!resetn) begin
         state_aw <= IDLE;
@@ -212,8 +211,7 @@ always @(posedge clk) begin
     end
 end
 
-
-// CONVENIENCE
+/**** CONVENIENCE ****/
 assign inst_rd_req = inst_req    & ~inst_wr;
 assign data_rd_req = data_req    & ~data_wr;
 assign data_wt_req = data_req    &  data_wr;
