@@ -81,26 +81,27 @@ reg        state_w ;
 reg        state_b ;
 
 // axi buffer
-reg        arid_r  ; // ar
-reg        araddr_r;
-reg        arsize_r;
-reg        awaddr_r; // aw
-reg        awsize_r;
-reg        wdata_r ; // w
-reg        wstrb_r ;
+reg [ 3:0] arid_r  ; // ar
+reg [31:0] araddr_r;
+reg [ 2:0] arsize_r;
+reg [31:0] awaddr_r; // aw
+reg [ 2:0] awsize_r;
+reg [31:0] wdata_r ; // w
+reg [ 3:0] wstrb_r ;
 
 // sram buffer
 
 
 // for convenience
-wire       inst_rd_req;
-wire       data_rd_req;
-wire       data_wt_req;
-wire       inst_rd_rcv;
-wire       data_rd_rcv;
-wire       data_wt_rcv;
+wire        inst_rd_req;
+wire        data_rd_req;
+wire        data_wt_req;
+wire        inst_rd_rcv;
+wire        data_rd_rcv;
+wire        data_wt_rcv;
 
-
+wire [ 2:0] inst_size_t;
+wire [ 2:0] data_size_t;
 
 
 /**************** LOGIC ****************/
@@ -154,13 +155,6 @@ assign wlast   = 1'b1;
 //*assign bready  = ;
 
 /**** SRAM SLAVE (from CPU-core) ****/
-// GENERAL
-assign inst_rd_req = inst_req    & ~inst_wr;
-assign data_rd_req = data_req    & ~data_wr;
-assign data_wt_req = data_req    &  data_wr;
-assign inst_rd_rcv = inst_rd_req &  inst_addr_ok;
-assign data_rd_rcv = data_rd_req &  data_addr_ok;
-assign data_wt_rcv = data_wt_req &  data_addr_ok;
 
 // READ
 //   inst sram
@@ -191,58 +185,78 @@ assign data_wt_rcv = data_wt_req &  data_addr_ok;
 always @(posedge clk) begin
     if (!resetn) begin
         state_ar <= IDLE;
+        arid_r[0]<= 1'b0;
+        araddr_r <= 32'b0;
+        arsize_r <= 3'b0;
     end
-    else if (!state_ar ) begin//TODO
+    else if (!state_ar && data_rd_req) begin
         state_ar <= WORK;
+        arid_r[0]<= 1'b0;
+        araddr_r <= data_addr;
+        arsize_r <= data_size_t;
     end
-    else if (state_ar && arvalid) begin//TODO
+    else if (!state_ar && inst_rd_req) begin
+        state_ar <= WORK;
+        arid_r[0]<= 1'b0;
+        araddr_r <= inst_addr;
+        arsize_r <= inst_size_t;
+    end
+    else if (state_ar && arvalid && arready) begin
         state_ar <= IDLE;
-    end
-end
-always @(posedge clk) begin
-    if (!resetn) begin
-        state_r <= IDLE;
-    end
-    else if (!state_ar ) begin//TODO
-        state_r <= WORK;
-    end
-    else if (state_ar && arvalid) begin//TODO
-        state_r <= IDLE;
+        arid_r[0]<= 1'b0;
+        araddr_r <= 32'b0;
+        arsize_r <= 3'b0;
     end
 end
 always @(posedge clk) begin
     if (!resetn) begin
         state_aw <= IDLE;
+        awaddr_r <= 32'b0;
+        awsize_r <= 3'b0;
     end
-    else if (!state_ar ) begin//TODO
+    else if (!state_aw && !state_w && data_wt_req) begin
         state_aw <= WORK;
+        awaddr_r <= data_addr;
+        awsize_r <= data_size;
     end
-    else if (state_ar && arvalid) begin//TODO
+    else if (state_aw && awvalid && awready) begin
         state_aw <= IDLE;
+        awaddr_r <= 32'b0;
+        awsize_r <= 3'b0;
     end
-end
-always @(posedge clk) begin
+
     if (!resetn) begin
         state_w <= IDLE;
+        wdata_r <= 32'b0;
+        wstrb_r <= 4'b0;
     end
-    else if (!state_ar) begin//TODO
+    else if (!state_w && !state_w && data_wt_req) begin
         state_w <= WORK;
+        wdata_r <= data_wdata;
+        wstrb_r <= data_wstrb;
     end
-    else if (state_ar && arvalid) begin//TODO
+    else if (state_w && wvalid && wready) begin
         state_w <= IDLE;
-    end
-end
-always @(posedge clk) begin
-    if (!resetn) begin
-        state_b <= IDLE;
-    end
-    else if (!state_ar ) begin//TODO
-        state_b <= WORK;
-    end
-    else if (state_ar && arvalid) begin//TODO
-        state_b <= IDLE;
+        wdata_r <= 32'b0;
+        wstrb_r <= 4'b0;
     end
 end
 
+// CONVENIENCE
+assign inst_rd_req = inst_req    & ~inst_wr;
+assign data_rd_req = data_req    & ~data_wr;
+assign data_wt_req = data_req    &  data_wr;
+assign inst_rd_rcv = inst_rd_req &  inst_addr_ok;
+assign data_rd_rcv = data_rd_req &  data_addr_ok;
+assign data_wt_rcv = data_wt_req &  data_addr_ok;
+
+/*
+ |  _size  |  _size_t  |  byte  |
+ |     00  |      001  |     1  |
+ |     01  |      010  |     2  |
+ |     10  |      100  |     4  |
+*/
+assign inst_size_t = {inst_size, ~|inst_size};
+assign data_size_t = {data_size, ~|data_size};
 
 endmodule
