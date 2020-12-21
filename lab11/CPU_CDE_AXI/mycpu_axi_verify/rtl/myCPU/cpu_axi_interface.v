@@ -175,7 +175,6 @@ always @(posedge clk) begin
         arsize_r <= 3'b0;
     end
 end
-//    r
 
 // WRITE
 //   aw/w
@@ -212,7 +211,6 @@ always @(posedge clk) begin
         wstrb_r <= 4'b0;
     end
 end
-//    b
 
 
 // CONVENIENCE
