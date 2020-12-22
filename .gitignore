@@ -34,3 +34,6 @@ lab11/CPU_CDE_AXI/Readme_First.txt
 # lab 13
 lab13/tlb_verify/run_vivado
 lab13/tlb_verify/testbench
+# lab 16
+lab16/cache_verify/run_vivado
+lab16/cache_verify/testbench
