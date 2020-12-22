@@ -1,3 +1,12 @@
+/*
+[4.2]=requirement, [4.3]= suggestion
+1.[4.2-7] RAW not supported now (not sure)
+2.[4.3-4] no state machine for 'r' and 'b' (state_r, state_b)
+3.[4.3-6] SRAM-slave's input might has been stored, yet it do not need to be stored(?)
+!!4.[4.3-8] use valid&&ready in addr_ok and data_ok
+*/
+
+
 module cpu_axi_interface(
     input         clk         ,
     input         resetn      ,
@@ -70,35 +79,36 @@ module cpu_axi_interface(
 
 /**************** DECLARATION ****************/
 
-localparam IDLE   = 1'b0;
-localparam WORK   = 1'b1;
+// Gerneral
+localparam INST  = 4'h0;
+localparam DATA  = 4'h1;
 
-// state machine
-reg        state_ar;
-reg        state_r ;
-reg        state_aw;
-reg        state_w ;
-reg        state_b ;
+localparam IDLE  = 2'h0;
+localparam WORK  = 2'h1;
+localparam BLOCK = 2'h2;
+
+reg  [ 1:0] state_ar;
+reg  [ 1:0] state_aw; // aw&w
+reg  [ 1:0] state_r ;
+reg  [ 1:0] state_b ;
 
 // axi buffer
-reg [ 3:0] arid_r  ; // ar
-reg [31:0] araddr_r;
-reg [ 2:0] arsize_r;
-reg [31:0] awaddr_r; // aw
-reg [ 2:0] awsize_r;
-reg [31:0] wdata_r ; // w
-reg [ 3:0] wstrb_r ;
+reg  [ 3:0] arid_r  ; // ar
+reg  [31:0] araddr_r;
+reg  [ 2:0] arsize_r;
+reg  [31:0] awaddr_r; // aw
+reg  [ 2:0] awsize_r;
+reg  [31:0] wdata_r ; // w
+reg  [ 3:0] wstrb_r ;
 
 // sram buffer
-
+reg  [31:0] rdata_r;
+reg         rdata_r_valid;
 
 // for convenience
 wire        inst_rd_req;
 wire        data_rd_req;
 wire        data_wt_req;
-wire        inst_rd_rcv;
-wire        data_rd_rcv;
-wire        data_wt_rcv;
 
 wire [ 2:0] inst_size_t;
 wire [ 2:0] data_size_t;
@@ -108,14 +118,15 @@ wire [ 2:0] data_size_t;
 
 /**** OUTPUT ****/
 // inst sram
-assign inst_addr_ok = !state_ar && inst_rd_req && !data_rd_req;
-assign inst_data_ok =  state_ar && rready && !rid[0];
-assign inst_rdata   =  rdata;
+assign inst_addr_ok = (state_ar==IDLE) && inst_rd_req && !data_rd_req;
+assign inst_data_ok = (rid==INST) && rvalid && rready; //!error here should not be valid&&ready
+assign inst_rdata   =  rdata_r_valid ? rdata_r : rdata;
 // data sram
-assign data_addr_ok = data_rd_req && !state_ar
-                    ||data_wt_req && !state_aw && !state_w;
-assign data_data_ok = state_ar && rready && rid[0];
-assign data_rdata   = rdata;
+assign data_addr_ok = data_rd_req && (state_ar==IDLE)
+                    ||data_wt_req && (state_aw==IDLE);
+assign data_data_ok = (rid==DATA) && (rvalid && rready //!error here should not be valid&&ready
+                                    ||bvalid && bready);
+assign data_rdata   =  rdata_r_valid ? rdata_r : rdata;
 // ar
 assign arid    = arid_r;
 assign araddr  = araddr_r;
@@ -125,7 +136,7 @@ assign arburst = 2'b01;
 assign arlock  = 1'b0;
 assign arcache = 4'b0;
 assign arprot  = 3'b0;
-assign arvalid = state_ar;
+assign arvalid = (state_ar==WORK);
 // r
 assign rready  = rvalid;
 // aw
@@ -137,13 +148,13 @@ assign awburst = 2'b01;
 assign awlock  = 1'b0;
 assign awcache = 4'b0;
 assign awprot  = 3'b0;
-assign awvalid = state_aw;
+assign awvalid = (state_aw==WORK);
 // w
 assign wid     = 4'b1;
 assign wdata   = wdata_r;
 assign wstrb   = wstrb_r;
 assign wlast   = 1'b1;
-assign wvalid  = state_w;
+assign wvalid  = (state_aw==WORK);
 // b
 assign bready  = bvalid;
 
@@ -152,25 +163,29 @@ assign bready  = bvalid;
 always @(posedge clk) begin
     if (!resetn) begin
         state_ar <= IDLE;
-        arid_r[0]<= 1'b0;
+        arid_r   <= 4'b0;
         araddr_r <= 32'b0;
         arsize_r <= 3'b0;
     end
-    else if (!state_ar && data_rd_req) begin
+    else if ((state_ar!=WORK) && (state_aw==WORK) //! [RAW block]here not sure
+           && data_rd_req && (data_addr==awaddr_r)) begin
+        state_ar <= BLOCK;
+    end
+    else if ((state_ar!=WORK) && data_rd_req) begin
         state_ar <= WORK;
-        arid_r[0]<= 1'b0;
+        arid_r   <= DATA;
         araddr_r <= data_addr;
         arsize_r <= data_size_t;
     end
-    else if (!state_ar && inst_rd_req) begin
+    else if ((state_ar!=WORK) && inst_rd_req) begin
         state_ar <= WORK;
-        arid_r[0]<= 1'b0;
+        arid_r   <= INST;
         araddr_r <= inst_addr;
         arsize_r <= inst_size_t;
     end
-    else if (state_ar && arvalid && arready) begin
+    else if ((state_ar==WORK) && arvalid && arready) begin
         state_ar <= IDLE;
-        arid_r[0]<= 1'b0;
+        arid_r   <= 4'b0;
         araddr_r <= 32'b0;
         arsize_r <= 3'b0;
     end
@@ -178,46 +193,33 @@ end
 
 // WRITE
 always @(posedge clk) begin
-    if (!resetn) begin
+    if (!resetn) begin // aw
         state_aw <= IDLE;
         awaddr_r <= 32'b0;
         awsize_r <= 3'b0;
+        wdata_r  <= 32'b0;
+        wstrb_r  <= 4'b0;
     end
-    else if (!state_aw && !state_w && data_wt_req) begin
+    else if ((state_aw==IDLE) && data_wt_req) begin
         state_aw <= WORK;
         awaddr_r <= data_addr;
         awsize_r <= data_size;
+        wdata_r  <= data_wdata;
+        wstrb_r  <= data_wstrb;
     end
-    else if (state_aw && awvalid && awready) begin
+    else if ((state_aw==WORK) && awvalid && awready) begin
         state_aw <= IDLE;
         awaddr_r <= 32'b0;
         awsize_r <= 3'b0;
-    end
-
-    if (!resetn) begin
-        state_w <= IDLE;
-        wdata_r <= 32'b0;
-        wstrb_r <= 4'b0;
-    end
-    else if (!state_w && !state_w && data_wt_req) begin
-        state_w <= WORK;
-        wdata_r <= data_wdata;
-        wstrb_r <= data_wstrb;
-    end
-    else if (state_w && wvalid && wready) begin
-        state_w <= IDLE;
-        wdata_r <= 32'b0;
-        wstrb_r <= 4'b0;
+        wdata_r  <= 32'b0;
+        wstrb_r  <= 4'b0;
     end
 end
 
 /**** CONVENIENCE ****/
-assign inst_rd_req = inst_req    & ~inst_wr;
-assign data_rd_req = data_req    & ~data_wr;
-assign data_wt_req = data_req    &  data_wr;
-assign inst_rd_rcv = inst_rd_req &  inst_addr_ok;
-assign data_rd_rcv = data_rd_req &  data_addr_ok;
-assign data_wt_rcv = data_wt_req &  data_addr_ok;
+assign inst_rd_req = inst_req & ~inst_wr;
+assign data_rd_req = data_req & ~data_wr;
+assign data_wt_req = data_req &  data_wr;
 
 /*
  | _size | _size_t | byte |
@@ -228,5 +230,24 @@ assign data_wt_rcv = data_wt_req &  data_addr_ok;
 */
 assign inst_size_t = {inst_size, ~|inst_size};
 assign data_size_t = {data_size, ~|data_size};
+
+always @(posedge clk) begin
+    if (!resetn) begin
+        rdata_r_valid <= 1'b0;
+    end
+    else if (!rdata_r_valid && rvalid && rready) begin
+        rdata_r_valid <= 1'b1;
+    end
+    else if (rdata_r_valid && arvalid && arready) begin
+        rdata_r_valid <= 1'b0;
+    end
+
+    if (!resetn) begin
+        rdata_r <= 32'b0;
+    end
+    else if (!rdata_r_valid && rvalid && rready) begin
+        rdata_r <= rdata;
+    end
+end
 
 endmodule
