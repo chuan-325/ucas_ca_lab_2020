@@ -1,7 +1,7 @@
 module cache(
     input          clk      ,
     input          resetn   ,
-    // cpu_interface
+    // cpu
     input          valid    ,
     input          op       ,
     input  [  8:0] index    ,
@@ -12,7 +12,7 @@ module cache(
     output         addr_ok  ,
     output         data_ok  ,
     output         rdata    ,
-    // axi_interface r
+    // axi r
     output         rd_req   ,
     output [  2:0] rd_type  ,
     output [ 31:0] rd_addr  ,
@@ -20,7 +20,7 @@ module cache(
     input          ret_valid,
     input  [  1:0] ret_last ,
     input  [ 31:0] ret_data ,
-    // axi_interface w
+    // axi w
     output         wr_req   ,
     output [  2:0] wr_type  ,
     output [ 31:0] wr_addr  ,
