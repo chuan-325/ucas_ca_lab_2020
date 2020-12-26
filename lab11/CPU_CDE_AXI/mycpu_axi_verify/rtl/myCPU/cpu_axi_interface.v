@@ -114,6 +114,8 @@ reg         data_rdata_r_valid;
 
 // new
 reg  [31:0] awaddr_t;
+reg         read_wait_write;
+reg         write_wait_read;
 
 // for convenience
 wire        inst_rd_req;
@@ -170,8 +172,6 @@ assign data_data_ok = (r_curstate == ReadEnd && r_nxtstate == ReadStart && arid 
 assign inst_rdata = inst_rdata_r;
 assign data_rdata = data_rdata_r;
 
-
-//! 1. priority 2. reset 3. conditional
 always@(posedge clk) begin
     if (rvalid && arid == 4'd0) begin
         inst_rdata_r <= rdata;
@@ -198,9 +198,9 @@ begin
     case(r_curstate)
         ReadStart:
         begin
-            if(data_req && ~data_wr)
+            if(data_rd_req)
                 r_nxtstate = Read_data_check;
-            else if(inst_req && ~inst_wr)
+            else if(inst_rd_req)
                 r_nxtstate = Readinst;
             else
                 r_nxtstate = r_curstate;
@@ -214,7 +214,7 @@ begin
         end
         Read_data_check:
         begin
-            if(bready && awaddr_t[31:2] == araddr[31:2])//!
+            if(bready && awaddr_t[31:2] == araddr[31:2])
                 r_nxtstate = r_curstate;
             else
                 r_nxtstate = Readdata;
@@ -238,7 +238,7 @@ begin
         begin
             if(inst_req && inst_wr)
                 w_nxtstate = Writeinst;
-            else if(data_req && data_wr)
+            else if(data_wt_req)
                 w_nxtstate = Writedata;
             else
                 w_nxtstate = w_curstate;
@@ -311,7 +311,7 @@ always@(posedge clk)
 begin
     if(~resetn) begin
         awaddr_t   <= 32'd0;
-    end else if(data_req && data_wr && w_curstate == WriteStart) begin
+    end else if(data_wt_req && w_curstate == WriteStart) begin
         awaddr_t   <= data_addr;
     end else if(bvalid) begin
         awaddr_t   <= 32'd0;
@@ -372,6 +372,28 @@ begin
     else if(bvalid)
         bready_r <= 1'b0;
 end
+
+/**** wait ****/
+always@(posedge clk)
+begin
+    if(~resetn)
+        read_wait_write <= 1'b0;
+    else if(r_curstate == ReadStart && r_nxtstate == Read_data_check && bready && ~bvalid)
+        read_wait_write <= 1'b1;
+    else if(bvalid)
+        read_wait_write <= 1'b0;
+end
+
+always@(posedge clk)
+begin
+    if(~resetn)
+        write_wait_read <= 1'b0;
+    else if(w_curstate == WriteStart && w_nxtstate == Writedata && rready && ~rvalid)
+        write_wait_read <= 1'b1;
+    else if(rvalid)
+        write_wait_read <= 1'b0;
+end
+
 
 /**** CONVENIENCE ****/
 assign inst_rd_req = inst_req & ~inst_wr;
