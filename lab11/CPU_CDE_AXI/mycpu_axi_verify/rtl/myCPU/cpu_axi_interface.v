@@ -87,10 +87,10 @@ parameter Writeinst        = 3'd5;
 parameter Writedata        = 3'd6;
 parameter WriteEnd         = 3'd7;
 
-reg  [ 2:0] r_cstate;
-reg  [ 2:0] r_nstate;
-reg  [ 2:0] w_cstate;
-reg  [ 2:0] w_nstate;
+reg  [ 2:0] r_cstate ; // c=current
+reg  [ 2:0] r_nstate ; // n=next
+reg  [ 2:0] w_cstate ;
+reg  [ 2:0] w_nstate ;
 
 // axi buffer
 reg  [ 3:0] arid_r   ; // ar
@@ -128,7 +128,7 @@ wire [ 2:0] data_size_t;
 
 /**************** LOGIC ****************/
 
-/**** OUTPUT ****/
+/**** 1 OUTPUT ****/
 // ar
 assign arid    = arid_r;
 assign araddr  = araddr_r;
@@ -167,12 +167,10 @@ assign inst_data_ok = r_cstate == ReadEnd && arid_eq_i;
 assign data_addr_ok = (r_cstate == ReadStart && r_nstate == Read_data_check)
                    || (w_cstate == WriteStart && w_nstate == Writedata);
 assign data_data_ok = (r_cstate == ReadEnd && r_nstate == ReadStart && arid_eq_d)
-                   || (w_cstate == WriteEnd && w_nstate == WriteStart)
-                   || rvalid;
+                   || (w_cstate == WriteEnd && w_nstate == WriteStart);
 
 assign inst_rdata = inst_rdata_r;
 assign data_rdata = data_rdata_r;
-
 always@(posedge clk) begin
     if (!resetn) begin
         inst_rdata_r <= 32'b0;
@@ -186,7 +184,7 @@ always@(posedge clk) begin
     end
 end
 
-/**** State Machine ****/
+/**** 2 State Machine ****/
 always@(posedge clk) begin
     if(!resetn) begin
         r_cstate <= ReadStart;
@@ -392,7 +390,7 @@ always@(posedge clk) begin
 end
 
 
-/**** CONVENIENCE ****/
+/**** 3 CONVENIENCE ****/
 assign arid_eq_i = (arid == 4'd0);
 assign arid_eq_d = (arid == 4'd1);
 
@@ -400,7 +398,7 @@ assign inst_rd_req = inst_req & ~inst_wr;
 assign data_rd_req = data_req & ~data_wr;
 assign data_wt_req = data_req &  data_wr;
 
-/*
+/* note for _size_t
  | _size | _size_t | byte |
  |-------|---------|------|
  |    00 |     001 |    1 |
