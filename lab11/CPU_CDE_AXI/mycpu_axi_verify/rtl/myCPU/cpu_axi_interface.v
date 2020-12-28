@@ -284,6 +284,7 @@ always@(posedge clk) begin
         arsize_r <= inst_size_t;
     end
     else if (r_cstate == ReadEnd) begin
+        arid_r   <= 4'd0;
         araddr_r <= 32'd0;
     end
 end
