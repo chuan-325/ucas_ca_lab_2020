@@ -87,10 +87,10 @@ parameter Writeinst        = 3'd5;
 parameter Writedata        = 3'd6;
 parameter WriteEnd         = 3'd7;
 
-reg [2:0] r_curstate;
-reg [2:0] r_nxtstate;
-reg [2:0] w_curstate;
-reg [2:0] w_nxtstate;
+reg  [ 2:0] r_cstate;
+reg  [ 2:0] r_nstate;
+reg  [ 2:0] w_cstate;
+reg  [ 2:0] w_nstate;
 
 // axi buffer
 reg  [ 3:0] arid_r   ; // ar
@@ -160,13 +160,13 @@ assign wvalid  = wvalid_r;
 assign bready  = bready_r;
 
 // sram
-assign inst_addr_ok = (r_curstate == ReadStart && r_nxtstate == Readinst)
-                   || (w_curstate == WriteStart && w_nxtstate == Writeinst);
-assign inst_data_ok = r_curstate == ReadEnd && arid == 4'd0;
-assign data_addr_ok = (r_curstate == ReadStart && r_nxtstate == Read_data_check)
-                   || (w_curstate == WriteStart && w_nxtstate == Writedata);
-assign data_data_ok = (r_curstate == ReadEnd && r_nxtstate == ReadStart && arid == 4'd1)
-                   || (w_curstate == WriteEnd && w_nxtstate == WriteStart)
+assign inst_addr_ok = (r_cstate == ReadStart && r_nstate == Readinst)
+                   || (w_cstate == WriteStart && w_nstate == Writeinst);
+assign inst_data_ok = r_cstate == ReadEnd && arid == 4'd0;
+assign data_addr_ok = (r_cstate == ReadStart && r_nstate == Read_data_check)
+                   || (w_cstate == WriteStart && w_nstate == Writedata);
+assign data_data_ok = (r_cstate == ReadEnd && r_nstate == ReadStart && arid == 4'd1)
+                   || (w_cstate == WriteEnd && w_nstate == WriteStart)
                    || rvalid;
 
 assign inst_rdata = inst_rdata_r;
@@ -182,124 +182,118 @@ always@(posedge clk) begin
 end
 
 /**** State Machine ****/
-always@(posedge clk)
-begin
-    if(~resetn) begin
-        r_curstate <= ReadStart;
-        w_curstate <= WriteStart;
+always@(posedge clk) begin
+    if(!resetn) begin
+        r_cstate <= ReadStart;
+        w_cstate <= WriteStart;
     end else begin
-        r_curstate <= r_nxtstate;
-        w_curstate <= w_nxtstate;
+        r_cstate <= r_nstate;
+        w_cstate <= w_nstate;
     end
 end
 
-always@(*)
-begin
-    case(r_curstate)
+always@(*) begin
+    case(r_cstate)
         ReadStart:
         begin
             if(data_rd_req)
-                r_nxtstate = Read_data_check;
+                r_nstate = Read_data_check;
             else if(inst_rd_req)
-                r_nxtstate = Readinst;
+                r_nstate = Readinst;
             else
-                r_nxtstate = r_curstate;
+                r_nstate = r_cstate;
         end
         Readinst, Readdata:
         begin
             if(rvalid)
-                r_nxtstate = ReadEnd;
+                r_nstate = ReadEnd;
             else
-                r_nxtstate = r_curstate;
+                r_nstate = r_cstate;
         end
         Read_data_check:
         begin
             if(bready && awaddr_t[31:2] == araddr[31:2])
-                r_nxtstate = r_curstate;
+                r_nstate = r_cstate;
             else
-                r_nxtstate = Readdata;
+                r_nstate = Readdata;
         end
         ReadEnd:
         begin
             if(read_wait_write)
-                r_nxtstate = r_curstate;
+                r_nstate = r_cstate;
             else
-                r_nxtstate = ReadStart;
+                r_nstate = ReadStart;
         end
         default:
-            r_nxtstate = ReadStart;
+            r_nstate = ReadStart;
     endcase
 end
 
-always@(*)
-begin
-    case (w_curstate)
+always@(*) begin
+    case (w_cstate)
         WriteStart:
         begin
             if(inst_req && inst_wr)
-                w_nxtstate = Writeinst;
+                w_nstate = Writeinst;
             else if(data_wt_req)
-                w_nxtstate = Writedata;
+                w_nstate = Writedata;
             else
-                w_nxtstate = w_curstate;
+                w_nstate = w_cstate;
         end
         Writeinst, Writedata:
         begin
             if(bvalid)
-                w_nxtstate = WriteEnd;
+                w_nstate = WriteEnd;
             else
-                w_nxtstate = w_curstate;
+                w_nstate = w_cstate;
         end
         WriteEnd:
         begin
             if(write_wait_read)
-                w_nxtstate = w_curstate;
+                w_nstate = w_cstate;
             else
-                w_nxtstate = WriteStart;
+                w_nstate = WriteStart;
         end
         default:
-            w_nxtstate = WriteStart;
+            w_nstate = WriteStart;
     endcase
 end
 
 
 //READ
 //ar
-always@(posedge clk)
-begin
+always@(posedge clk) begin
     if (!resetn) begin
         arid_r   <= 4'd0;
         araddr_r <= 32'd0;
         arsize_r <= 3'd0;
-    end else if(r_curstate == ReadStart && r_nxtstate == Readinst) begin
+    end else if(r_cstate == ReadStart && r_nstate == Readinst) begin
         arid_r   <= 4'd0;
         araddr_r <= inst_addr;
         arsize_r <= !inst_size ? 3'd1 : {inst_size, 1'b0};
-    end else if(r_curstate == ReadStart && r_nxtstate == Read_data_check) begin
+    end else if(r_cstate == ReadStart && r_nstate == Read_data_check) begin
         arid_r   <= 4'd1;
         araddr_r <= {data_addr[31:2], 2'd0};
         arsize_r <= data_size_t;
-    end else if(r_curstate == ReadEnd) begin
+    end else if(r_cstate == ReadEnd) begin
         araddr_r <= 32'd0;
     end
 end
 
-always@(posedge clk)
-begin
-    if(~resetn)
+always@(posedge clk) begin
+    if(!resetn)
         arvalid_r <= 1'b0;
-    else if(r_curstate == ReadStart && r_nxtstate == Readinst || r_curstate == Read_data_check && r_nxtstate == Readdata)
+    else if(r_cstate == ReadStart && r_nstate == Readinst || r_cstate == Read_data_check && r_nstate == Readdata)
         arvalid_r <= 1'b1;
     else if(arready)
         arvalid_r <= 1'b0;
 end
 
 //r
-always@(posedge clk)
-begin
-    if(~resetn)
+always@(posedge clk) begin
+    if(!resetn)
         rready_r <= 1'b1;
-    else if(r_nxtstate == Readinst || r_nxtstate == Read_data_check)
+    else if(r_nstate == Readinst || r_nstate == Read_data_check)
         rready_r <= 1'b1;
     else if(rvalid)
         rready_r <= 1'b0;
@@ -307,88 +301,83 @@ end
 
 // WRITE
 //aw
-always@(posedge clk)
-begin
-    if(~resetn) begin
+always@(posedge clk) begin
+    if(!resetn) begin
         awaddr_t   <= 32'd0;
-    end else if(data_wt_req && w_curstate == WriteStart) begin
+    end else if(data_wt_req && w_cstate == WriteStart) begin
         awaddr_t   <= data_addr;
     end else if(bvalid) begin
         awaddr_t   <= 32'd0;
     end
 end
 
-always@(posedge clk)
-begin
-    if(w_curstate == WriteStart && w_nxtstate == Writeinst) begin
+always@(posedge clk) begin
+    if(w_cstate == WriteStart && w_nstate == Writeinst) begin
         awaddr_r <= inst_addr;
         awsize_r <= !inst_size ? 3'd1 : {inst_size, 1'b0};
-    end else if(w_curstate == WriteStart && w_nxtstate == Writedata) begin
+    end else if(w_cstate == WriteStart && w_nstate == Writedata) begin
         awaddr_r <= {data_addr[31:2], 2'd0};
         awsize_r <= data_size_t;
     end
 end
 
-always@(posedge clk)
-begin
-    if(~resetn)
+always@(posedge clk) begin
+    if(!resetn)
         awvalid_r <= 1'b0;
-    else if(w_curstate == WriteStart && (w_nxtstate == Writeinst || w_nxtstate == Writedata))
+    else if(w_cstate == WriteStart && (w_nstate == Writeinst || w_nstate == Writedata))
         awvalid_r <= 1'b1;
     else if(awready)
         awvalid_r <= 1'b0;
 end
 
 //w
-always@(posedge clk)
-begin
-    if(w_curstate == WriteStart && w_nxtstate == Writeinst) begin
+always@(posedge clk) begin
+    if(w_cstate == WriteStart && w_nstate == Writeinst) begin
         wdata_r <= inst_wdata;
         wstrb_r <= inst_wstrb;
     end
-    else if(w_curstate == WriteStart && w_nxtstate == Writedata) begin
+    else if(w_cstate == WriteStart && w_nstate == Writedata) begin
         wdata_r <= data_wdata;
         wstrb_r <= data_wstrb;
     end
 end
 
-always@(posedge clk)
-begin
-    if(~resetn)
+always@(posedge clk) begin
+    if(!resetn) begin
         wvalid_r <= 1'b0;
-    else if(w_curstate == WriteStart && (w_nxtstate == Writeinst || w_nxtstate == Writedata))
+    end
+    else if(w_cstate == WriteStart && (w_nstate == Writeinst || w_nstate == Writedata)) begin
         wvalid_r <= 1'b1;
-    else if(wready)
+    end
+    else if(wready) begin
         wvalid_r <= 1'b0;
+    end
 end
 
 //b
-always@(posedge clk)
-begin
-    if(~resetn)
+always@(posedge clk) begin
+    if(!resetn)
         bready_r <= 1'b0;
-    else if(w_nxtstate == Writeinst || w_nxtstate == Writedata)
+    else if(w_nstate == Writeinst || w_nstate == Writedata)
         bready_r <= 1'b1;
     else if(bvalid)
         bready_r <= 1'b0;
 end
 
 /**** wait ****/
-always@(posedge clk)
-begin
-    if(~resetn)
+always@(posedge clk) begin
+    if(!resetn)
         read_wait_write <= 1'b0;
-    else if(r_curstate == ReadStart && r_nxtstate == Read_data_check && bready && ~bvalid)
+    else if(r_cstate == ReadStart && r_nstate == Read_data_check && bready && ~bvalid)
         read_wait_write <= 1'b1;
     else if(bvalid)
         read_wait_write <= 1'b0;
 end
 
-always@(posedge clk)
-begin
-    if(~resetn)
+always@(posedge clk) begin
+    if(!resetn)
         write_wait_read <= 1'b0;
-    else if(w_curstate == WriteStart && w_nxtstate == Writedata && rready && ~rvalid)
+    else if(w_cstate == WriteStart && w_nstate == Writedata && rready && ~rvalid)
         write_wait_read <= 1'b1;
     else if(rvalid)
         write_wait_read <= 1'b0;
