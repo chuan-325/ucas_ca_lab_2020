@@ -30,7 +30,7 @@ module cpu_axi_interface(
 
     /* axi */
     // master: interface, slave: axi
-    //input: slave->master, output: master->slave
+    // input: slave->master, output: master->slave
     // ar: read request
     output [ 3:0] arid        ,
     output [31:0] araddr      ,
@@ -108,9 +108,7 @@ reg         bready_r ; // b
 
 // sram buffer
 reg  [31:0] inst_rdata_r;
-reg         inst_rdata_r_valid;
 reg  [31:0] data_rdata_r;
-reg         data_rdata_r_valid;
 
 // new
 reg  [31:0] awaddr_t;
@@ -118,6 +116,9 @@ reg         read_wait_write;
 reg         write_wait_read;
 
 // for convenience
+wire        arid_eq_i;
+wire        arid_eq_d;
+
 wire        inst_rd_req;
 wire        data_rd_req;
 wire        data_wt_req;
@@ -162,10 +163,10 @@ assign bready  = bready_r;
 // sram
 assign inst_addr_ok = (r_cstate == ReadStart && r_nstate == Readinst)
                    || (w_cstate == WriteStart && w_nstate == Writeinst);
-assign inst_data_ok = r_cstate == ReadEnd && arid == 4'd0;
+assign inst_data_ok = r_cstate == ReadEnd && arid_eq_i;
 assign data_addr_ok = (r_cstate == ReadStart && r_nstate == Read_data_check)
                    || (w_cstate == WriteStart && w_nstate == Writedata);
-assign data_data_ok = (r_cstate == ReadEnd && r_nstate == ReadStart && arid == 4'd1)
+assign data_data_ok = (r_cstate == ReadEnd && r_nstate == ReadStart && arid_eq_d)
                    || (w_cstate == WriteEnd && w_nstate == WriteStart)
                    || rvalid;
 
@@ -173,11 +174,15 @@ assign inst_rdata = inst_rdata_r;
 assign data_rdata = data_rdata_r;
 
 always@(posedge clk) begin
-    if (rvalid && arid == 4'd0) begin
-        inst_rdata_r <= rdata;
+    if (!resetn) begin
+        inst_rdata_r <= 32'b0;
+        data_rdata_r <= 32'b0;
     end
-    else begin
+    else if (rvalid && arid_eq_d) begin
         data_rdata_r <= rdata;
+    end
+    else if (rvalid && arid_eq_i) begin
+        inst_rdata_r <= rdata;
     end
 end
 
@@ -186,7 +191,8 @@ always@(posedge clk) begin
     if(!resetn) begin
         r_cstate <= ReadStart;
         w_cstate <= WriteStart;
-    end else begin
+    end
+    else begin
         r_cstate <= r_nstate;
         w_cstate <= w_nstate;
     end
@@ -267,15 +273,17 @@ always@(posedge clk) begin
         arid_r   <= 4'd0;
         araddr_r <= 32'd0;
         arsize_r <= 3'd0;
-    end else if(r_cstate == ReadStart && r_nstate == Readinst) begin
-        arid_r   <= 4'd0;
-        araddr_r <= inst_addr;
-        arsize_r <= !inst_size ? 3'd1 : {inst_size, 1'b0};
     end else if(r_cstate == ReadStart && r_nstate == Read_data_check) begin
         arid_r   <= 4'd1;
         araddr_r <= {data_addr[31:2], 2'd0};
         arsize_r <= data_size_t;
-    end else if(r_cstate == ReadEnd) begin
+    end
+    else if(r_cstate == ReadStart && r_nstate == Readinst) begin
+        arid_r   <= 4'd0;
+        araddr_r <= inst_addr;
+        arsize_r <= !inst_size ? 3'd1 : {inst_size, 1'b0};
+    end
+    else if(r_cstate == ReadEnd) begin
         araddr_r <= 32'd0;
     end
 end
@@ -385,6 +393,9 @@ end
 
 
 /**** CONVENIENCE ****/
+assign arid_eq_i = (arid == 4'd0);
+assign arid_eq_d = (arid == 4'd1);
+
 assign inst_rd_req = inst_req & ~inst_wr;
 assign data_rd_req = data_req & ~data_wr;
 assign data_wt_req = data_req &  data_wr;
