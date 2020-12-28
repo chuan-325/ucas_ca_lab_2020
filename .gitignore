@@ -22,13 +22,12 @@ lab9/CPU_CDE/soft
 lab9/CPU_CDE/Readme_First.txt
 # lab 10
 lab10/CPU_CDE_SRAM/cpu132_gettrace
-lab10/CPU_CDE_SRAM/.vscode
 lab10/CPU_CDE_SRAM/soft
 lab10/CPU_CDE_SRAM/Readme_First.txt
 lab10/ucas_CDE_axi_ref
 # lab 11
 lab11/CPU_CDE_AXI/cpu132_gettrace
-lab11/CPU_CDE_AXI/.vscode
+lab11/CPU_CDE_AXI/.vscode/c_cpp_properties.json
 lab11/CPU_CDE_AXI/soft
 lab11/CPU_CDE_AXI/Readme_First.txt
 # lab 13
