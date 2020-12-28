@@ -29,6 +29,10 @@ lab10/ucas_CDE_axi_ref
 lab11/CPU_CDE_AXI/cpu132_gettrace
 lab11/CPU_CDE_AXI/soft
 lab11/CPU_CDE_AXI/Readme_First.txt
+# lab 12
+lab12/CPU_CDE_AXI/cpu132_gettrace
+lab12/CPU_CDE_AXI/soft
+lab12/CPU_CDE_AXI/Readme_First.txt
 # lab 13
 lab13/tlb_verify/run_vivado
 lab13/tlb_verify/testbench
