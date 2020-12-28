@@ -201,7 +201,7 @@ always@(*) begin
     case(r_cstate)
         ReadStart:
             begin
-                if (data_rd_req)
+                if (data_rd_req && w_cstate == WriteStart)
                     r_nstate = Read_data_check;
                 else if (inst_rd_req)
                     r_nstate = Readinst;
