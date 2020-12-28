@@ -65,7 +65,7 @@ if_stage if_stage(
     //brbus
     .br_bus          (br_bus            ),
     //outputs
-    .fs_to_ds_valid  (fs_to_ds_vali     ),
+    .fs_to_ds_valid  (fs_to_ds_valid    ),
     .fs_to_ds_bus    (fs_to_ds_bus      ),
     //flush
     .ws_pc_gen_exc   (ws_pc_gen_exc     ),
