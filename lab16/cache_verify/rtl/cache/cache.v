@@ -29,25 +29,26 @@ module cache(
     input          wr_rdy   );
 
 /**********DECLARATION**********/
-reg  [ 22:0]  pseudo_random_23;
+// --- STATE MACHINE ---
+reg [2:0] cstate;
+reg [2:0] nstate;
+parameter IDLE    = 3'd0;
+parameter LOOKUP  = 3'd1;
+parameter MISS    = 3'd2;
+parameter REPLACE = 3'd3;
+parameter REFILL  = 3'd4;
 
-//Tag Compare
-wire         way0_hit;
-wire         way1_hit;
-wire         cache_hit;
+// --- CPU & CACHE ---
+reg start;
+reg [31:0] rdata_r;
+reg [1:0] rd_cnt;
 
-//Data Select
-//select data from two ways
-wire [127:0]  way0_data;
-wire [127:0]  way1_data;
-wire [31:0]   way0_load_word;
-wire [31:0]   way1_load_word;
-wire [31:0]   load_res;
-reg           replace_way;
-wire [127:0]  replace_data;
-
-//Request Buffer
-//save information from input ports
+// --- AXI & CACHE ---
+//w
+reg            wr_req_r;
+wire [19:0]    replace_addr;
+reg  [19:0]    replace_addr_r;
+//Request Buffer: save input info
 reg           op_r;
 reg   [ 7:0]  index_r;
 reg   [19:0]  tag_r;
@@ -57,11 +58,39 @@ reg   [31:0]  wdata_r;
 reg           busy;
 reg   [127:0] replace_data_r;
 
+
+// TAG_V
+//Tag Compare
+wire         way0_hit;
+wire         way1_hit;
+wire         cache_hit;
+//Data Select: 2 ways
+wire [127:0]  way0_data;
+wire [127:0]  way1_data;
+wire [31:0]   way0_load_word;
+wire [31:0]   way1_load_word;
+wire [31:0]   load_res;
+reg           replace_way;
+wire [127:0]  replace_data;
+//LFSR
+reg  [ 22:0]  pseudo_random_23;
+//tag_v_ram_0
+wire [2:0] tag_v_ram_0_we;
+wire [7:0] tag_v_ram_0_addr;
+wire [23:0]tag_v_ram_0_wdata;
+wire [23:0]tag_v_ram_0_rdata;
+//tag_v_ram_1
+wire [2:0] tag_v_ram_1_we;
+wire [7:0] tag_v_ram_1_addr;
+wire [23:0]tag_v_ram_1_wdata;
+wire [23:0]tag_v_ram_1_rdata;
+// ways
 wire         way0_v;
 wire         way1_v;
 wire [19:0]  way0_tag;
 wire [19:0]  way1_tag;
 
+// DIRTY
 //dirty_ram_0
 wire [7:0]   dirty_ram_0_raddr;
 wire         dirty_ram_0_rd;
@@ -117,18 +146,9 @@ wire [7:0] data_ram_bank3_1_addr;
 wire [31:0]data_ram_bank3_1_wdata;
 wire [31:0]data_ram_bank3_1_rdata;
 
-//main state machine
-reg [2:0] cstate;
-reg [2:0] nstate;
-parameter IDLE    = 3'd0;
-parameter LOOKUP  = 3'd1;
-parameter MISS    = 3'd2;
-parameter REPLACE = 3'd3;
-parameter REFILL  = 3'd4;
-
-
 /**********LOGIC**********/
 
+/* state machine */
 always@(posedge clk) begin
     if (~resetn) begin
         cstate <= IDLE;
@@ -180,10 +200,7 @@ always@(*) begin
     endcase
 end
 
-/***************CPU & CACHE***************/
-reg start;
-reg [31:0] rdata_r;
-reg [1:0] rd_cnt;
+/* CPU & CACHE */
 always @(posedge clk) begin
     if (!resetn) begin
         rd_cnt <= 2'b00;
@@ -217,15 +234,13 @@ end
 assign addr_ok = (cstate == LOOKUP);
 assign data_ok = (cstate == IDLE & start);
 assign rdata = rdata_r;
-/***************AXI & CACHE***************/
+
+/* AXI & CACHE */
 //r
 assign rd_req = (cstate == REPLACE);
 assign rd_type = 3'b100;
 assign rd_addr = {tag_r,index_r,4'b00};
 //w
-reg wr_req_r;
-wire [19:0]    replace_addr;
-reg  [19:0]    replace_addr_r;
 assign replace_addr = replace_way? way1_tag : way0_tag;
 always@(posedge clk) begin
     if (!resetn)
@@ -287,7 +302,6 @@ always@(posedge clk)begin
 end
 
 //Tag Compare
-
 assign way0_hit = way0_v && (way0_tag == tag_r);
 assign way1_hit = way1_v && (way1_tag == tag_r);
 //? assign way0_hit = way0_v && (way0_tag == tag_r & cstate != IDLE);
@@ -331,10 +345,6 @@ always @ (posedge clk) begin
 
 //TAG_V
 //tag_v_ram_0
-wire [2:0] tag_v_ram_0_we;
-wire [7:0] tag_v_ram_0_addr;
-wire [23:0]tag_v_ram_0_wdata;
-wire [23:0]tag_v_ram_0_rdata;
 assign tag_v_ram_0_we = (cstate == REFILL & replace_way == 0)? 3'b111:0;
 assign tag_v_ram_0_addr = busy? index_r : valid? index :0;
 assign tag_v_ram_0_wdata = {tag_r,4'b0001};
@@ -346,10 +356,6 @@ tag_v_ram tag_v_ram_0(
 .douta(tag_v_ram_0_rdata) );
 
 //tag_v_ram_1
-wire [2:0] tag_v_ram_1_we;
-wire [7:0] tag_v_ram_1_addr;
-wire [23:0]tag_v_ram_1_wdata;
-wire [23:0]tag_v_ram_1_rdata;
 assign tag_v_ram_1_we = (cstate == REFILL & replace_way == 1)? 3'b111:0;
 assign tag_v_ram_1_addr = busy? index_r : valid? index :0;
 assign tag_v_ram_1_wdata = {tag_r,4'b0001};
@@ -359,7 +365,7 @@ tag_v_ram tag_v_ram_1(
 .addra(tag_v_ram_1_addr)   ,
 .dina(tag_v_ram_1_wdata)   ,
 .douta(tag_v_ram_1_rdata) );
-
+// ways
 assign way0_v   = tag_v_ram_0_rdata[0];
 assign way1_v   = tag_v_ram_1_rdata[0];
 assign way0_tag = tag_v_ram_0_rdata[23:4];
@@ -507,6 +513,4 @@ data_ram_bank data_ram_bank3_1(
 .dina(data_ram_bank3_1_wdata),
 .douta(data_ram_bank3_1_rdata));
 
-
 endmodule
-
