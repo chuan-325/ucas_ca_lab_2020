@@ -86,7 +86,40 @@ wire [ 5:0] ws_ext_int_in;
 wire [ 4:0] ws_excode;
 wire [31:0] ws_badvaddr;
 
-wire [31:0] c0_rdata_or_refetch_pc
+wire [31:0] c0_rdata_or_refetch_pc;
+
+// lab14 added
+wire [ 3:0] c0_index;
+wire [31:0] c0_entrylo0;
+wire [31:0] c0_entrylo1;
+// tlb
+    // write port
+wire [ 3:0] w_index;
+wire        we;     //w(rite) e(nable)
+wire [18:0] w_vpn2;
+wire [ 7:0] w_asid;
+wire        w_g;
+wire [19:0] w_pfn0;
+wire [ 2:0] w_c0;
+wire        w_d0;
+wire        w_v0;
+wire [19:0] w_pfn1;
+wire [ 2:0] w_c1;
+wire        w_d1;
+wire        w_v1;
+   // read port
+wire  [3:0] r_index;
+wire [18:0] r_vpn2;
+wire [ 7:0] r_asid;
+wire  r_g;
+wire [19:0] r_pfn0;
+wire [ 2:0] r_c0;
+wire  r_d0;
+wire  r_v0;
+wire [19:0] r_pfn1;
+wire [ 2:0] r_c1;
+wire  r_d1;
+wire  r_v1;
 
 /*  LOGIC  */
 
@@ -119,7 +152,7 @@ assign {tlb_miss       , //132
         ws_pc            //31:0
        } = ms_to_ws_bus_r;
 //lab14 added
-assign c0_rdata_or_refetch_pc = (refetch)?ws_pc:c0_rdata;
+assign c0_rdata_or_refetch_pc = refetch ? ws_pc : ws_c0_rdata;
 assign ws_to_fs_bus = {
         tlb_miss, //35
         refetch, //34
@@ -196,36 +229,6 @@ end
 assign ws_exc_intr = ws_c0_has_int
                    ||ws_has_int;
 
-//tlb
-// write port
-wire   we;     //w(rite) e(nable)
-wire  [ 3:0] w_index;
-wire  [18:0] w_vpn2;
-wire  [ 7:0] w_asid;
-wire   w_g;
-wire  [19:0] w_pfn0;
-wire  [ 2:0] w_c0;
-wire   w_d0;
-wire   w_v0;
-wire  [19:0] w_pfn1;
-wire  [ 2:0] w_c1;
-wire   w_d1;
-wire   w_v1;
-
-   // read port
-wire  [3:0] r_index;
-wire [18:0] r_vpn2;
-wire [ 7:0] r_asid;
-wire  r_g;
-wire [19:0] r_pfn0;
-wire [ 2:0] r_c0;
-wire  r_d0;
-wire  r_v0;
-wire [19:0] r_pfn1;
-wire [ 2:0] r_c1;
-wire  r_d1;
-wire  r_v1;
-
 regs_c0 u_reg_c0(
     .clk        (clk          ),
     .rst        (reset        ),
@@ -244,26 +247,26 @@ regs_c0 u_reg_c0(
     .wb_sel     (ws_sel       ),
     .c0_wdata   (ws_c0_wdata  ),
     .has_int    (ws_c0_has_int), //out
-    .c0_rdata   (ws_c0_rdata  )
-    .c0_entryhi    (c0_entryhi),
-    .c0_entrylo0   (c0_entrylo0),
-    .c0_entrylo1   (c0_entrylo1),
-    .c0_index      (c0_index),
-    .tlbp          (tlbp),
-    .tlbp_found    (tlbp_found),
-    .index         (index),
-    .tlbr          (tlbr),
-    .r_vpn2        (r_vpn2),
-    .r_asid        (r_asid),
-    .r_g           (r_g),
-    .r_pfn0        (r_pfn0),
-    .r_c0          (r_c0),
-    .r_d0          (r_d0),
-    .r_v0          (r_v0),
-    .r_pfn1        (r_pfn1),
-    .r_c1          (r_c1),
-    .r_d1          (r_d1),
-    .r_v1          (r_v1)
+    .c0_rdata   (ws_c0_rdata  ),
+    .c0_entryhi (c0_entryhi),
+    .c0_entrylo0(c0_entrylo0),
+    .c0_entrylo1(c0_entrylo1),
+    .c0_index   (c0_index),
+    .tlbp       (tlbp), //in
+    .tlbp_found (tlbp_found),
+    .index      (index),
+    .tlbr       (tlbr),
+    .r_vpn2     (r_vpn2),
+    .r_asid     (r_asid),
+    .r_g        (r_g),
+    .r_pfn0     (r_pfn0),
+    .r_c0       (r_c0),
+    .r_d0       (r_d0),
+    .r_v0       (r_v0),
+    .r_pfn1     (r_pfn1),
+    .r_c1       (r_c1),
+    .r_d1       (r_d1),
+    .r_v1       (r_v1)
 );
 
 assign exc_flush = ( ws_ex
@@ -276,9 +279,19 @@ assign debug_wb_rf_wen   = {4{rf_we}};
 assign debug_wb_rf_wnum  = ws_dest;
 assign debug_wb_rf_wdata = rf_wdata;// ws_final_result;
 
+assign w_vpn2 = c0_entryhi[31:13];
+assign w_asid = c0_entryhi[7:0];
+assign w_g    = c0_entrylo0[0] & c0_entrylo1[0];
+assign w_pfn0 = c0_entrylo0[25:6];
+assign w_c0   = c0_entrylo0[5:3];
+assign w_d0   = c0_entrylo0[2];
+assign w_v0   = c0_entrylo0[1];
+assign w_pfn1 = c0_entrylo1[25:6];
+assign w_c1   = c0_entrylo1[5:3];
+assign w_d1   = c0_entrylo1[2];
+assign w_v1   = c0_entrylo1[1];
 
-tlb TLB
-(
+tlb u_tlb(
      .clk     (clk),
     // search port 0
      .s0_vpn2        (s0_vpn2), //
@@ -304,18 +317,18 @@ tlb TLB
 
     // write port
      .we              (tlbwi),
-     .w_index         (c0_index[3:0]),
-     .w_vpn2          (c0_entryhi[31:13]),
-     .w_asid          (c0_entryhi[7:0]),
-     .w_g             (c0_entrylo0[0] & c0_entrylo1[0]),
-     .w_pfn0          (c0_entrylo0[25:6]),
-     .w_c0            (c0_entrylo0[5:3]),
-     .w_d0            (c0_entrylo0[2]),
-     .w_v0            (c0_entrylo0[1]),
-     .w_pfn1          (c0_entrylo1[25:6]),
-     .w_c1            (c0_entrylo1[5:3]),
-     .w_d1            (c0_entrylo1[2]),
-     .w_v1            (c0_entrylo0[1]),
+     .w_index         (w_index),
+     .w_vpn2          (w_vpn2),
+     .w_asid          (w_asid),
+     .w_g             (w_g),
+     .w_pfn0          (w_pfn0),
+     .w_c0            (w_c0),
+     .w_d0            (w_d0),
+     .w_v0            (w_v0),
+     .w_pfn1          (w_pfn1),
+     .w_c1            (w_c1),
+     .w_d1            (w_d1),
+     .w_v1            (w_v1),
 
      // read port
      .r_index       (c0_index[3:0]), //
