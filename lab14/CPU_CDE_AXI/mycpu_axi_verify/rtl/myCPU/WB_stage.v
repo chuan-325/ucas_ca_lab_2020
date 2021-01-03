@@ -8,6 +8,8 @@ module wb_stage(
     //from ms
     input                           ms_to_ws_valid  ,
     input  [`MS_TO_WS_BUS_WD -1:0]  ms_to_ws_bus    ,
+    //to fs
+    output [`WS_TO_FS_BUS_WD -1:0]  ws_to_fs_bus    ,
     //to rf: for write back
     output [`WS_TO_RF_BUS_WD -1:0]  ws_to_rf_bus    ,
     // flush
@@ -17,7 +19,25 @@ module wb_stage(
     output [31:0]                   debug_wb_pc     ,
     output [ 3:0]                   debug_wb_rf_wen ,
     output [ 4:0]                   debug_wb_rf_wnum,
-    output [31:0]                   debug_wb_rf_wdata
+    output [31:0]                   debug_wb_rf_wdata,
+    //tlb
+    input  [18:0]                  s0_vpn2,
+    input                          s0_odd_page,
+    output                         s0_found,
+    output [ 3:0]                  s0_index,
+    output [19:0]                  s0_pfn,
+    output [ 2:0]                  s0_c,
+    output                         s0_d,
+    output                         s0_v,
+    input  [18:0]                  s1_vpn2,
+    input                          s1_odd_page,
+    output                         s1_found,
+    output [ 3:0]                  s1_index,
+    output [19:0]                  s1_pfn,
+    output [ 2:0]                  s1_c,
+    output                         s1_d,
+    output                         s1_v,
+    output [31:0]                  c0_entryhi
 );
 
 /*  DECLARATION  */
@@ -66,9 +86,20 @@ wire [ 5:0] ws_ext_int_in;
 wire [ 4:0] ws_excode;
 wire [31:0] ws_badvaddr;
 
+wire [31:0] c0_rdata_or_refetch_pc
+
 /*  LOGIC  */
 
-assign {ws_exc_of      , //120
+assign {tlb_miss       , //132
+        tlb_invalid    , //131
+        tlb_modify     , //130
+        refetch        , //129
+        s1_index       , //128:125
+        tlbp_found     , //124
+        inst_tlbp      , //123
+        inst_tlbr      , //122
+        inst_tlbwi     , //121
+        ws_exc_of      , //120
         ws_exc_ades    , //119
         ws_exc_adel_if , //118
         ws_exc_adel_ld , //117
@@ -87,6 +118,15 @@ assign {ws_exc_of      , //120
         ws_badvaddr    , //63:32
         ws_pc            //31:0
        } = ms_to_ws_bus_r;
+//lab14 added
+assign c0_rdata_or_refetch_pc = (refetch)?ws_pc:c0_rdata;
+assign ws_to_fs_bus = {
+        tlb_miss, //35
+        refetch, //34
+        ws_ex, //33
+        ws_inst_eret, //32
+        c0_rdata_or_refetch_pc //31:0
+};
 
 assign ws_gpr_we_t = ws_gpr_we & ~exc_flush;
 
@@ -134,6 +174,9 @@ assign ws_excode = ws_exc_intr      ? `EX_INTR :
                    ws_exc_of        ? `EX_OV   :
                    ws_exc_bp        ? `EX_BP   :
                    ws_exc_sysc      ? `EX_SYS  :
+                   tlb_modify       ? `EX_MOD  :
+                   (tlb_miss|tlb_invalid)&ws_gpr_we? `EX_TLBL :
+                   (tlb_miss|tlb_invalid)&!ws_gpr_we? `EX_TLBS :
                ({5{ws_exc_adel_ld}} & `EX_ADEL
                |{5{ws_exc_ades}}    & `EX_ADES);
 assign ws_pc_gen_exc = {32{ws_inst_eret}} & ws_c0_rdata
@@ -152,6 +195,36 @@ always @(posedge clk) begin
 end
 assign ws_exc_intr = ws_c0_has_int
                    ||ws_has_int;
+
+//tlb
+// write port
+wire   we;     //w(rite) e(nable)
+wire  [ 3:0] w_index;
+wire  [18:0] w_vpn2;
+wire  [ 7:0] w_asid;
+wire   w_g;
+wire  [19:0] w_pfn0;
+wire  [ 2:0] w_c0;
+wire   w_d0;
+wire   w_v0;
+wire  [19:0] w_pfn1;
+wire  [ 2:0] w_c1;
+wire   w_d1;
+wire   w_v1;
+
+   // read port
+wire  [3:0] r_index;
+wire [18:0] r_vpn2;
+wire [ 7:0] r_asid;
+wire  r_g;
+wire [19:0] r_pfn0;
+wire [ 2:0] r_c0;
+wire  r_d0;
+wire  r_v0;
+wire [19:0] r_pfn1;
+wire [ 2:0] r_c1;
+wire  r_d1;
+wire  r_v1;
 
 regs_c0 u_reg_c0(
     .clk        (clk          ),
@@ -172,6 +245,25 @@ regs_c0 u_reg_c0(
     .c0_wdata   (ws_c0_wdata  ),
     .has_int    (ws_c0_has_int), //out
     .c0_rdata   (ws_c0_rdata  )
+    .c0_entryhi    (c0_entryhi),
+    .c0_entrylo0   (c0_entrylo0),
+    .c0_entrylo1   (c0_entrylo1),
+    .c0_index      (c0_index),
+    .tlbp          (tlbp),
+    .tlbp_found    (tlbp_found),
+    .index         (index),
+    .tlbr          (tlbr),
+    .r_vpn2        (r_vpn2),
+    .r_asid        (r_asid),
+    .r_g           (r_g),
+    .r_pfn0        (r_pfn0),
+    .r_c0          (r_c0),
+    .r_d0          (r_d0),
+    .r_v0          (r_v0),
+    .r_pfn1        (r_pfn1),
+    .r_c1          (r_c1),
+    .r_d1          (r_d1),
+    .r_v1          (r_v1)
 );
 
 assign exc_flush = ( ws_ex
@@ -183,5 +275,62 @@ assign debug_wb_pc       = ws_pc;
 assign debug_wb_rf_wen   = {4{rf_we}};
 assign debug_wb_rf_wnum  = ws_dest;
 assign debug_wb_rf_wdata = rf_wdata;// ws_final_result;
+
+
+tlb TLB
+(
+     .clk     (clk),
+    // search port 0
+     .s0_vpn2        (s0_vpn2), //
+     .s0_odd_page    (s0_odd_page), //
+     .s0_asid        (c0_entryhi[7:0]), //
+     .s0_found       (s0_found),
+     .s0_index       (s0_index),
+     .s0_pfn         (s0_pfn),
+     .s0_c           (s0_c),
+     .s0_d           (s0_d),
+     .s0_v           (s0_v),
+
+    // search port 1
+     .s1_vpn2        (s1_vpn2), //
+     .s1_odd_page    (s1_odd_page), //
+     .s1_asid        (c0_entryhi[7:0]), //
+     .s1_found       (s1_found),
+     .s1_index       (s1_index),
+     .s1_pfn         (s1_pfn),
+     .s1_c           (s1_c),
+     .s1_d           (s1_d),
+     .s1_v           (s1_v),
+
+    // write port
+     .we              (tlbwi),
+     .w_index         (c0_index[3:0]),
+     .w_vpn2          (c0_entryhi[31:13]),
+     .w_asid          (c0_entryhi[7:0]),
+     .w_g             (c0_entrylo0[0] & c0_entrylo1[0]),
+     .w_pfn0          (c0_entrylo0[25:6]),
+     .w_c0            (c0_entrylo0[5:3]),
+     .w_d0            (c0_entrylo0[2]),
+     .w_v0            (c0_entrylo0[1]),
+     .w_pfn1          (c0_entrylo1[25:6]),
+     .w_c1            (c0_entrylo1[5:3]),
+     .w_d1            (c0_entrylo1[2]),
+     .w_v1            (c0_entrylo0[1]),
+
+     // read port
+     .r_index       (c0_index[3:0]), //
+     .r_vpn2        (r_vpn2),
+     .r_asid        (r_asid),
+     .r_g           (r_g),
+     .r_pfn0        (r_pfn0),
+     .r_c0          (r_c0),
+     .r_d0          (r_d0),
+     .r_v0          (r_v0),
+     .r_pfn1        (r_pfn1),
+     .r_c1          (r_c1),
+     .r_d1          (r_d1),
+     .r_v1          (r_v1)
+     );
+
 
 endmodule

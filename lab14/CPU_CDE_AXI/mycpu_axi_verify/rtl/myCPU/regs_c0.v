@@ -18,8 +18,27 @@ module regs_c0(
     input  [ 2:0] wb_sel     ,
     input  [31:0] c0_wdata   ,
     output        has_int    ,
-    output [31:0] c0_rdata
-);
+    output [31:0] c0_rdata   ,
+    //lab14 added
+    output [31:0] c0_entryhi,
+    output [31:0] c0_entrylo0,
+    output [31:0] c0_entrylo1,
+    output [31:0] c0_index,
+    input         tlbp,
+    input         tlbp_found,
+    input  [3:0]  index,
+    input         tlbr,
+    input  [18:0] r_vpn2,
+    input  [ 7:0] r_asid,
+    input         r_g,
+    input  [19:0] r_pfn0,
+    input  [ 2:0] r_c0,
+    input         r_d0,
+    input         r_v0,
+    input  [19:0] r_pfn1,
+    input  [ 2:0] r_c1,
+    input         r_d1,
+    input         r_v1);
 
 /* declarations */
 wire [7:0] c0_addr;
@@ -72,6 +91,10 @@ assign addr_eq_epc      = (c0_addr == `CR_EPC      );
 assign addr_eq_count    = (c0_addr == `CR_COUNT    );
 assign addr_eq_compare  = (c0_addr == `CR_COMPARE  );
 assign addr_eq_badvaddr = (c0_addr == `CR_BADVADDR );
+assign addr_eq_entryhi  = (c0_addr == `CR_ENTRYHi  );
+assign addr_eq_entrylo0 = (c0_addr == `CR_ENTRYLo0 );
+assign addr_eq_entrylo1 = (c0_addr == `CR_ENTRYLo1 );
+assign addr_eq_index    = (c0_addr == `CR_INDEX    );
 
 /* outputs */
 assign c0_rdata = {32{addr_eq_status}}         & c0_status
@@ -79,7 +102,11 @@ assign c0_rdata = {32{addr_eq_status}}         & c0_status
                 | {32{addr_eq_epc|eret_flush}} & c0_epc
                 | {32{addr_eq_count}}          & c0_count
                 | {32{addr_eq_compare}}        & c0_compare
-                | {32{addr_eq_badvaddr}}       & c0_badvaddr;
+                | {32{addr_eq_badvaddr}}       & c0_badvaddr
+                | {32{addr_eq_entryhi}}        & c0_entryhi
+                | {32{addr_eq_badvaddr}}       & c0_entrylo0
+                | {32{addr_eq_badvaddr}}       & c0_entrylo1
+                | {32{addr_eq_badvaddr}}       & c0_index;
 
 assign has_int = (| (c0_cause_ip & c0_status_im))
                   &  c0_status_ie
@@ -224,4 +251,112 @@ always @(posedge clk) begin
     end
 end
 
+//lab14 added
+
+//entryhi
+reg  [18:0]c0_entryhi_vpn2;
+wire [4:0] c0_entryhi_12_8;
+reg  [7:0] c0_entryhi_asid;
+
+assign c0_entryhi = {
+            c0_entryhi_vpn2,
+            c0_entryhi_12_8,
+            c0_entryhi_asid
+            };
+assign c0_entryhi_12_8 = 0;
+always @(posedge clk) begin
+    if(rst) begin
+        c0_entryhi_vpn2 <= 19'h0;
+        c0_entryhi_asid <= 8'h0;
+    end
+    if(mtc0_we && c0_addr == `CR_ENTRYHi) begin
+        c0_entryhi_vpn2 <= c0_wdata[31:13];
+        c0_entryhi_asid <= c0_wdata[7:0];
+    end
+    if(tlbr) begin
+        c0_entryhi_vpn2 <= r_vpn2;
+        c0_entryhi_asid <= r_asid;
+    end
+    if((wb_excode==5'h01||wb_excode==5'h02||wb_excode==5'h03)&&wb_ex)
+        //c0_entryhi_vpn2<= wb_badvaddr[31:12];
+        c0_entryhi_vpn2<= wb_badvaddr[31:13];
+end
+
+//entrylo 0
+wire [5:0] c0_entrylo0_31_26;
+reg  [19:0]c0_entrylo0_pfn2;
+reg  [5:0] c0_entrylo0_C_D_V_G;
+
+assign c0_entrylo0 = {
+            c0_entrylo0_31_26,
+            c0_entrylo0_pfn2,
+            c0_entrylo0_C_D_V_G
+            };
+assign c0_entrylo0_31_26 = 0;
+always @(posedge clk) begin
+    if(rst) begin
+        c0_entrylo0_pfn2 <= 20'h0;
+        c0_entrylo0_C_D_V_G <= 6'h0;
+    end
+    if(mtc0_we && c0_addr == `CR_ENTRYLo0) begin
+        c0_entrylo0_pfn2 <= c0_wdata[25:6];
+        c0_entrylo0_C_D_V_G <= c0_wdata[5:0];
+    end
+    if(tlbr) begin
+        c0_entrylo0_pfn2 <= r_pfn0;
+        c0_entrylo0_C_D_V_G <= {r_c0,r_d0,r_v0,r_g};
+    end
+end
+
+//entrylo 1
+wire [5:0] c0_entrylo1_31_26;
+reg  [19:0]c0_entrylo1_pfn2;
+reg  [5:0] c0_entrylo1_C_D_V_G;
+
+assign c0_entrylo1 = {
+            c0_entrylo1_31_26,
+            c0_entrylo1_pfn2,
+            c0_entrylo1_C_D_V_G
+            };
+assign c0_entrylo1_31_26 = 0;
+always @(posedge clk) begin
+    if(rst) begin
+        c0_entrylo1_pfn2 <= 20'h0;
+        c0_entrylo1_C_D_V_G <= 6'h0;
+    end
+    if(mtc0_we && c0_addr == `CR_ENTRYLo1) begin
+        c0_entrylo1_pfn2 <= c0_wdata[25:6];
+        c0_entrylo1_C_D_V_G <= c0_wdata[5:0];
+    end
+    if(tlbr) begin
+        c0_entrylo1_pfn2 <= r_pfn1;
+        c0_entrylo1_C_D_V_G <= {r_c1,r_d1,r_v1,r_g};
+    end
+end
+
+//index
+reg        c0_index_p;
+wire [26:0]c0_index_30_4;
+reg  [3:0] c0_index_index;
+
+assign c0_index_30_4 = 0;
+assign c0_index = {
+            c0_index_p,
+            c0_index_30_4,
+            c0_index_index
+            };
+always@(posedge clk) begin
+    if(rst) begin
+        c0_index_p <= 1'b0;
+        c0_index_index <= 4'h0;
+    end
+    if(mtc0_we && c0_addr == `CR_INDEX  )
+        c0_index_index <= c0_wdata[3:0];
+    if(tlbp & ~tlbp_found)
+        c0_index_p <= 1;
+    if(tlbp & tlbp_found) begin
+        c0_index_p <= 0;
+        c0_index_index <= index;
+    end
+end
 endmodule

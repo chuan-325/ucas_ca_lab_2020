@@ -35,8 +35,6 @@ wire [31:0] fs_pc  ;
 wire [31:0] ds_inst;
 wire [31:0] ds_pc  ;
 
-wire [31:0] ds_badvaddr;
-
 reg  ds_bd;
 
 wire        rf_we   ;
@@ -139,6 +137,10 @@ wire        inst_mfc0;
 wire        inst_eret;
 wire        inst_sysc;
 wire        inst_bp  ;
+//lab14 added
+wire        inst_tlbp ;
+wire        inst_tlbr ;
+wire        inst_tlbwi;
 
 wire [ 5:0] ls_type;
 
@@ -206,15 +208,26 @@ wire inst_store;
 wire inst_jump;
 wire inst_branch;
 wire inst_privi;
-
 wire inst_jxr;
 wire inst_jnr;
+wire inst_tlb;
+
+//lab14 added
+wire tlb_miss;
+wire tlb_invalid;
+wire [31:0] fs_badvaddr;
+wire refetch;
+wire fs_ex;
 
 /*  LOGIC  */
 
 assign fs_pc = fs_to_ds_bus[31:0];
 
-assign {ds_badvaddr , //96:65
+assign {
+        tlb_invalid , //99
+        tlb_miss    , //98
+        fs_ex       , //97
+        fs_badvaddr , //96:65
         exc_adel_if , //64
         ds_inst     , //63:32
         ds_pc         //31:0
@@ -243,26 +256,34 @@ assign br_bus = {ds_to_es_valid, //34
                  br_target //31:0
                  };
 
-assign ds_to_es_bus = {ds_of_valid,  //198
-                       exc_adel_if,  //197
-                       exc_ri     ,  //196
-                       inst_bp    ,  //195
-                       inst_eret  ,  //194
-                       inst_sysc  ,  //193
-                       inst_mfc0  ,  //192
-                       inst_mtc0  ,  //191
-                       ds_bd      ,  //190
-                       sel        ,  //189:187
-                       rd         ,  //186:182
-                       ls_type    ,  //181:176
-                       inst_mtlo  ,  //175
-                       inst_mthi  ,  //174
-                       inst_mflo  ,  //173
-                       inst_mfhi  ,  //172
-                       inst_divu  ,  //171
-                       inst_div   ,  //170
-                       inst_multu ,  //169
-                       inst_mult  ,  //168
+assign ds_to_es_bus = {
+                       tlb_invalid,  //205
+                       tlb_miss   ,  //204
+                       refetch    ,  //203
+                       inst_tlbp  ,  //202
+                       inst_tlbr  ,  //201
+                       inst_tlbwi ,  //200
+                       ds_of_valid,  //199
+                       exc_adel_if,  //198
+                       exc_ri     ,  //197
+                       inst_bp    ,  //196
+                       inst_eret  ,  //195
+                       inst_sysc  ,  //194
+                       inst_mfc0  ,  //193
+                       inst_mtc0  ,  //192
+                       ds_bd      ,  //191
+                       sel        ,  //190:188
+                       rd         ,  //187:183
+                       ls_type    ,  //182:177
+                       inst_mtlo  ,  //176
+                       inst_mthi  ,  //175
+                       inst_mflo  ,  //174
+                       inst_mfhi  ,  //173
+                       inst_divu  ,  //172
+                       inst_div   ,  //171
+                       inst_multu ,  //170
+                       inst_mult  ,  //169
+                       inst_store ,  //168
                        alu_op     ,  //167:156
                        mem_re     ,  //155
                        src1_is_sa ,  //154
@@ -275,7 +296,7 @@ assign ds_to_es_bus = {ds_of_valid,  //198
                        imm        ,  //143:128
                        rs_value   ,  //127:96
                        rt_value   ,  //95:64
-                       ds_badvaddr,  //63:32
+                       fs_badvaddr,  //63:32
                        ds_pc         //31:0
                       };
 
@@ -387,9 +408,13 @@ assign inst_mfc0   = op_d[6'h10] & rs_d[5'h00] & sa_d[5'h00] & ~|func[5:3];
 assign inst_eret   = op_d[6'h10] & rs_d[5'h10] & rt_d[5'h00] & rd_d[5'h00]
                    & sa_d[5'h00] & func_d[6'h18];
 assign inst_sysc   = op_d[6'h00] & func_d[6'h0c];
-assign inst_bp      = op_d[6'h00] & func_d[6'h0d];
+assign inst_bp     = op_d[6'h00] & func_d[6'h0d];
+//lab14 added
+assign inst_tlbp   = op_d[6'h10] & ds_inst[25] & (ds_inst[24:6] == 0) & func_d[6'h08];
+assign inst_tlbr   = op_d[6'h10] & ds_inst[25] & (ds_inst[24:6] == 0) & func_d[6'h01];
+assign inst_tlbwi  = op_d[6'h10] & ds_inst[25] & (ds_inst[24:6] == 0) & func_d[6'h02];
 
-// SORT: 61 except: tlbp, tlbr, tlbwi, cache
+// SORT: 64 except: cache
 assign inst_arith  = inst_add  | inst_addu
                    | inst_addi | inst_addiu
                    | inst_sub  | inst_subu
@@ -427,11 +452,9 @@ assign inst_branch = inst_beq  | inst_bne
 assign inst_privi  = inst_mtc0 | inst_mfc0
                    | inst_eret | inst_sysc
                    | inst_bp   ;//5
-
-assign inst_jxr    = inst_jr
-                   | inst_jalr ;
-assign inst_jnr    = inst_j
-                   | inst_jal  ;
+assign inst_jxr    = inst_jr   | inst_jalr ;
+assign inst_jnr    = inst_j    | inst_jal  ;
+assign inst_tlb    = inst_tlbp | inst_tlbr | inst_tlbwi ; //3
 
 assign exc_ri      = ~|{inst_arith ,
                         inst_logic ,
@@ -440,7 +463,10 @@ assign exc_ri      = ~|{inst_arith ,
                         inst_store ,
                         inst_jump  ,
                         inst_branch,
-                        inst_privi};
+                        inst_privi ,
+                        inst_tlb   };
+
+assign refetch = inst_tlbr | inst_tlbwi; //lab14 added
 
 // load/store type
 assign ls_type = {inst_lhu | inst_lbu ,          // [5] unsigned extension
@@ -502,7 +528,8 @@ assign gpr_we      = ~|{inst_store, //5*store
                         inst_mult, inst_multu,
                         inst_div, inst_divu,
                         inst_mthi, inst_mtlo,
-                        inst_mtc0
+                        inst_mtc0,
+                        inst_tlbp, inst_tlbr, inst_tlbwi //lab14 added
                        };
 
 assign mem_re = inst_load;

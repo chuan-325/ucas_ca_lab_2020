@@ -24,7 +24,16 @@ module exe_stage(
     output [31:0]                  data_sram_addr ,
     output [ 3:0]                  data_sram_wstrb,
     output [31:0]                  data_sram_wdata,
-    input                          data_sram_addr_ok //in
+    input                          data_sram_addr_ok, //in
+    // tlb
+    output  [18:0]                 s1_vpn2        ,
+    output                         s1_odd_page    ,
+    input                          s1_found       ,
+    input   [ 3:0]                 s1_index       ,
+    input   [19:0]                 s1_pfn         ,
+    input                          s1_d           ,
+    input                          s1_v           ,
+    input   [31:0]                 c0_entryhi
 );
 
 /*  DECLARATION  */
@@ -39,12 +48,12 @@ reg [31:0] lo;
 
 reg  [`DS_TO_ES_BUS_WD -1:0] ds_to_es_bus_r;
 
-wire        es_of_valid ;
-wire [31:0] ds_badvaddr;
+wire        es_of_valid;
 wire [31:0] es_badvaddr;
 
 wire es_inst_mtc0;
 wire es_inst_mfc0;
+wire inst_store  ;
 
 wire es_inst_eret  ;
 wire es_exc_sysc   ;
@@ -144,28 +153,45 @@ wire [3:0] es_lad_d;
 
 reg dr_shkhd;
 
+wire fs_badvaddr;
+wire tlb_invalid_ds;
+wire tlb_invalid_es;
+wire tlb_miss_ds;
+wire tlb_miss_es;
+wire tlb_modify_es;
+wire refetch;
+wire tlbp_found;
+wire mapped;
+
 /*  LOGIC  */
 
-assign {es_of_valid    ,  //198
-        es_exc_adel_if ,  //197
-        es_exc_ri      ,  //196
-        es_exc_bp      ,  //195
-        es_inst_eret   ,  //194
-        es_exc_sysc    ,  //193
-        es_inst_mfc0   ,  //192
-        es_inst_mtc0   ,  //191
-        es_bd          ,  //190
-        es_sel         ,  //189:187
-        es_rd          ,  //186:182
-        es_ls_type     ,  //181:176
-        es_inst_mtlo   ,  //175
-        es_inst_mthi   ,  //174
-        es_inst_mflo   ,  //173
-        es_inst_mfhi   ,  //172
-        es_op_divu     ,  //171
-        es_op_div      ,  //170
-        es_op_multu    ,  //169
-        es_op_mult     ,  //168
+assign {tlb_invalid_ds ,  //205
+        tlb_miss_ds    ,  //204
+        refetch        ,  //203
+        inst_tlbp      ,  //202
+        inst_tlbr      ,  //201
+        inst_tlbwi     ,  //200
+        es_of_valid    ,  //199
+        es_exc_adel_if ,  //198
+        es_exc_ri      ,  //197
+        es_exc_bp      ,  //196
+        es_inst_eret   ,  //195
+        es_exc_sysc    ,  //194
+        es_inst_mfc0   ,  //193
+        es_inst_mtc0   ,  //192
+        es_bd          ,  //191
+        es_sel         ,  //190:188
+        es_rd          ,  //187:183
+        es_ls_type     ,  //182:177
+        es_inst_mtlo   ,  //176
+        es_inst_mthi   ,  //175
+        es_inst_mflo   ,  //174
+        es_inst_mfhi   ,  //173
+        es_op_divu     ,  //172
+        es_op_div      ,  //171
+        es_op_multu    ,  //170
+        es_op_mult     ,  //169
+        inst_store     ,  //168
         es_alu_op      ,  //167:156
         es_mem_re      ,  //155
         es_src1_is_sa  ,  //154
@@ -178,10 +204,20 @@ assign {es_of_valid    ,  //198
         es_imm         ,  //143:128
         es_rs_value    ,  //127:96
         es_rt_value    ,  //95:64
-        ds_badvaddr    ,  //63:32
+        fs_badvaddr    ,  //63:32
         es_pc             //31:0
        } = ds_to_es_bus_r;
 
+//lab14 added
+assign s1_vpn2     = inst_tlbp ? c0_entryhi[31:13]
+                   : es_alu_result[31:13];
+assign s1_odd_page = inst_tlbp ? 0
+                   : es_alu_result[12];
+assign mapped      = (es_alu_result[31:28] < 4'h8 | es_alu_result[31:28] >= 4'hc);
+assign tlbp_found  = inst_tlbp & s1_found;
+assign tlb_invalid_es =  s1_found & !s1_v & mapped & (es_ls_type!=0);
+assign tlb_miss_es    = !s1_found & mapped & (es_ls_type!=0);
+assign tlb_modify_es  =  s1_found &  s1_v & !s1_d & mapped & inst_store;
 
 assign es_exc_adel_ld = es_ls_type[2] & es_gpr_we &  data_sram_addr[0]   // l hw
                       | es_ls_type[0] & es_gpr_we & |data_sram_addr[1:0];// l w
@@ -206,12 +242,24 @@ assign es_ex    = es_inst_eret
                 | es_exc_bp
                 | es_exc_sysc
                 | es_exc_adel_ld
-                | es_exc_ades;
+                | es_exc_ades
+                | tlb_miss_es
+                | tlb_invalid_es
+                | tlb_modify_es;
 
 assign es_res_valid = ~es_mem_re
                     & ~es_inst_mfc0;
 
-assign es_to_ms_bus = {es_exc_of     , //161
+assign es_to_ms_bus = {tlb_miss_ds | tlb_miss_es   , //173
+                       tlb_invalid_ds | tlb_invalid_es, //172
+                       tlb_modify_es , //171
+                       refetch       , //170
+                       s1_index      , //169:166
+                       tlbp_found    , //165
+                       inst_tlbp     , //164
+                       inst_tlbr     , //163
+                       inst_tlbwi    , //162
+                       es_exc_of     , //161
                        es_exc_ades   , //160
                        es_exc_adel_ld, //159
                        es_exc_adel_if, //158
@@ -316,9 +364,11 @@ always @(posedge clk) begin
     end
 end
 
-assign data_sram_addr  = es_alu_result;
+assign data_sram_addr  = mapped ? {s1_pfn,{es_alu_result[11:0]}}
+                       : es_alu_result; //lab14 edited
 
-assign es_badvaddr = es_exc_adel_if ? ds_badvaddr : data_sram_addr;
+assign es_badvaddr = (es_exc_adel_if|tlb_miss_ds|tlb_invalid_ds) ? fs_badvaddr
+                   : data_sram_addr;
 
 assign write_strb = {4{ es_ls_type[4]}} & write_strb_swr // SWR
                   | {4{ es_ls_type[3]}} & write_strb_swl // SWL

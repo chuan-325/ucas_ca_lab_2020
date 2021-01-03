@@ -229,8 +229,9 @@ always @(posedge clk_g) begin
 end
 
 cache cache(
-    .clk_g  (clk_g),
+    .clk    (clk_g),
     .resetn (resetn),
+    // cpu
     .valid  (memref_valid),
     .op     (memref_op ),
     .index  (in_index  ),
@@ -238,11 +239,10 @@ cache cache(
     .offset (in_offset ),
     .wstrb  (memref_wstrb),
     .wdata  (memref_data),
-
     .addr_ok(cache_addr_ok),
     .data_ok(out_valid),
     .rdata  (cacheres ),
-
+    // axi r
     .rd_req   (rd_req   ),
     .rd_type  (rd_type  ),
     .rd_addr  (rd_addr  ),
@@ -250,7 +250,7 @@ cache cache(
     .ret_valid(ret_valid),
     .ret_last (ret_last ),
     .ret_data (ret_data ),
-
+    // axi w
     .wr_req  (wr_req  ),
     .wr_type (wr_type ),
     .wr_addr (wr_addr ),

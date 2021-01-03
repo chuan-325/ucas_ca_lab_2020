@@ -10,6 +10,8 @@ module if_stage(
     //to ds
     output                         fs_to_ds_valid   ,
     output [`FS_TO_DS_BUS_WD -1:0] fs_to_ds_bus     ,
+    // from ws
+    input  [`WS_TO_FS_BUS_WD -1:0] ws_to_fs_bus     ,
     // flush
     input  [31:0]                  ws_pc_gen_exc    ,
     input                          exc_flush        ,
@@ -22,7 +24,13 @@ module if_stage(
     output [31:0]                  inst_sram_wdata  ,
     input                          inst_sram_addr_ok,
     input                          inst_sram_data_ok,
-    input  [31:0]                  inst_sram_rdata
+    input  [31:0]                  inst_sram_rdata  ,
+    // tlb
+    output [18:0]                  s0_vpn2          ,
+    output                         s0_odd_page      ,
+    input                          s0_found         ,
+    input  [19:0]                  s0_pfn           ,
+    input                          s0_v
 );
 
 /*  DECLARATION  */
@@ -68,6 +76,20 @@ reg [31:0]             npc_buf;
 reg [31:0]             inst_buf;
 reg [`BR_BUS_WD - 1:0] br_buf;
 
+wire tlb_ex;
+wire tlb_invalid;
+wire tlb_miss;
+wire ws_refetch;
+wire es_ex;
+wire inst_eret;
+wire [31:0] cp0_rdata;
+wire fs_ex;
+wire [31:0] badvaddr;
+wire mapped;
+wire [31:0] true_npc_unmapped;
+wire [31:0] true_npc;
+wire wb_ex;
+
 
 /*  LOGIC  */
 
@@ -78,18 +100,47 @@ assign {br_stall, //33
         br_target //31:0
        } = br_buf[33:0];
 
-assign fs_to_ds_bus = {fs_badvaddr   ,  //97:65
+assign fs_to_ds_bus = {tlb_invalid   ,  //99
+                       tlb_miss      ,  //98
+                       fs_ex         ,  //97
+                       fs_badvaddr   ,  //96:65
                        fs_exc_adel_if,  //64
                        fs_inst       ,  //63:32
                        fs_pc        };  //31: 0
 
-assign fs_exc_adel_if = |fs_pc[1:0];
+assign {tlb_ex, //35
+        ws_refetch, //34
+        wb_ex, //33
+        inst_eret, //32
+        cp0_rdata //31:0
+} = ws_to_fs_bus;
 
-assign fs_badvaddr = {32{fs_exc_adel_if}} & fs_pc;
+assign tlb_miss    =!s0_found && mapped;
+assign tlb_invalid = s0_found && !s0_v && mapped;
+assign fs_exc_adel_if = |fs_pc[1:0];
+assign fs_ex       = (fs_exc_adel_if|tlb_miss|tlb_invalid) && fs_valid && ~wb_ex;
+assign badvaddr    = true_npc_unmapped;
+assign true_npc_unmapped = (wb_ex && tlb_ex) ? 32'hbfc00200:
+                           (wb_ex &&~tlb_ex) ? 32'hbfc00380:
+                            inst_eret        ? cp0_rdata   :
+                            ws_refetch       ? cp0_rdata   :
+                            npc_buf_valid    ? npc_buf     :
+                                               next_pc     ;
+assign true_npc    = mapped ? {s0_pfn,{true_npc_unmapped[11:0]}} :
+                     true_npc_unmapped;
+assign mapped      = (true_npc_unmapped[31:28] < 4'h8 || true_npc_unmapped[31:28] >= 4'hc);
+assign s0_vpn2     = true_npc_unmapped[31:13];
+assign s0_odd_page = true_npc_unmapped[12];
+
+assign fs_badvaddr = fs_exc_adel_if           ? fs_pc:
+                     (tlb_miss | tlb_invalid) ? badvaddr:
+                     32'b0;
 assign seq_pc      = fs_pc + 3'h4;
-assign next_pc     = exc_flush     ? ws_pc_gen_exc
-                   : br_taken_t    ? br_target
-                   : npc_buf_valid ? npc_buf
+assign next_pc     = (wb_ex&&!tlb_ex)? 32'hbfc00380
+                   : (wb_ex&& tlb_ex)? 32'hbfc00200
+                   : exc_flush       ? ws_pc_gen_exc
+                   : br_taken_t      ? br_target
+                   : npc_buf_valid   ? npc_buf
                    : seq_pc;
 
 assign fs_addr_ok  = inst_sram_req && inst_sram_addr_ok;
@@ -110,7 +161,8 @@ assign inst_sram_size  = 2'h2;
 assign inst_sram_wstrb = 4'h0;
 assign inst_sram_wdata = 32'b0;
 assign inst_sram_req   = do_req && !br_stall;
-assign inst_sram_addr  = next_pc;
+assign inst_sram_addr  = (tlb_miss|tlb_invalid) ? 32'hbfc00380
+                       : true_npc;
 assign fs_inst         = inst_buf_valid ? inst_buf
                                         : inst_sram_rdata;
 
@@ -205,6 +257,8 @@ always @(posedge clk) begin
         fs_throw<= fs_addr_ok_r&&!inst_sram_data_ok;
     end
 end
+
+
 
 
 /* data bufs */

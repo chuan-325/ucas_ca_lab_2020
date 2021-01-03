@@ -18,7 +18,7 @@ module cache(
     output [ 31:0] rd_addr  ,
     input          rd_rdy   ,
     input          ret_valid,
-    input  [  1:0] ret_last ,
+    input          ret_last ,
     input  [ 31:0] ret_data ,
     // axi w
     output         wr_req   ,
@@ -77,13 +77,13 @@ reg  [ 22:0]  pseudo_random_23;
 // tag_v_ram_0
 wire [2:0] tag_v_ram_0_we;
 wire [7:0] tag_v_ram_0_addr;
-wire [23:0]tag_v_ram_0_wdata;
-wire [23:0]tag_v_ram_0_rdata;
+wire [20:0]tag_v_ram_0_wdata;
+wire [20:0]tag_v_ram_0_rdata;
 // tag_v_ram_1
 wire [2:0] tag_v_ram_1_we;
 wire [7:0] tag_v_ram_1_addr;
-wire [23:0]tag_v_ram_1_wdata;
-wire [23:0]tag_v_ram_1_rdata;
+wire [20:0]tag_v_ram_1_wdata;
+wire [20:0]tag_v_ram_1_rdata;
 // ways
 wire         way0_v;
 wire         way1_v;
@@ -93,13 +93,13 @@ wire [19:0]  way1_tag;
 // DIRTY
 // dirty_ram_0
 wire [7:0]   dirty_ram_0_raddr;
-wire         dirty_ram_0_rd;
+//?wire         dirty_ram_0_rd;
 wire         dirty_ram_0_we;
 wire [7:0]   dirty_ram_0_waddr;
 wire         dirty_ram_0_wd;
 // dirty_ram_1
 wire [7:0]   dirty_ram_1_raddr;
-wire         dirty_ram_1_rd;
+//?wire         dirty_ram_1_rd;
 wire         dirty_ram_1_we;
 wire [7:0]   dirty_ram_1_waddr;
 wire         dirty_ram_1_wd;
@@ -239,13 +239,14 @@ assign rdata = rdata_r;
 // r
 assign rd_req = (cstate == REPLACE);
 assign rd_type = 3'b100;
-assign rd_addr = {tag_r,index_r,4'b00};
+assign rd_addr = {tag_r,index_r,4'b0};
 // w
 assign replace_addr = replace_way? way1_tag : way0_tag;
 always@(posedge clk) begin
     if (!resetn)
         wr_req_r <= 0;
-    else if (cstate == LOOKUP & nstate == MISS & ((dirty_ram_1_rd == 1)&replace_way | (dirty_ram_0_rd == 1)&~replace_way))
+    else if (cstate == LOOKUP & nstate == MISS)
+    //else if (cstate == LOOKUP & nstate == MISS & ((dirty_ram_1_rd == 1)&replace_way | (dirty_ram_0_rd == 1)&~replace_way))
         wr_req_r <= 1;
     else if (wr_rdy)
         wr_req_r <= 0;
@@ -274,7 +275,7 @@ always@(posedge clk)begin
 end
 assign wr_req = wr_req_r;
 assign wr_type = 3'b100;
-assign wr_addr = {replace_addr_r,index_r,4'b00};
+assign wr_addr = {replace_addr_r,index_r,4'b0};
 assign wr_wstrb = 4'b1111;
 assign wr_data = replace_data_r;
 
@@ -347,7 +348,7 @@ always @ (posedge clk) begin
 // tag_v_ram_0
 assign tag_v_ram_0_we = (cstate == REFILL & replace_way == 0)? 3'b111:0;
 assign tag_v_ram_0_addr = busy? index_r : valid? index :0;
-assign tag_v_ram_0_wdata = {tag_r,4'b0001};
+assign tag_v_ram_0_wdata = {tag_r,1'b1};
 tag_v_ram tag_v_ram_0(
 .clka(clk)                 ,
 .wea(tag_v_ram_0_we)       ,
@@ -358,7 +359,7 @@ tag_v_ram tag_v_ram_0(
 // tag_v_ram_1
 assign tag_v_ram_1_we = (cstate == REFILL & replace_way == 1)? 3'b111:0;
 assign tag_v_ram_1_addr = busy? index_r : valid? index :0;
-assign tag_v_ram_1_wdata = {tag_r,4'b0001};
+assign tag_v_ram_1_wdata = {tag_r,1'b1};
 tag_v_ram tag_v_ram_1(
 .clka(clk)                 ,
 .wea(tag_v_ram_1_we)       ,
@@ -368,8 +369,8 @@ tag_v_ram tag_v_ram_1(
 // ways
 assign way0_v   = tag_v_ram_0_rdata[0];
 assign way1_v   = tag_v_ram_1_rdata[0];
-assign way0_tag = tag_v_ram_0_rdata[23:4];
-assign way1_tag = tag_v_ram_1_rdata[23:4];
+assign way0_tag = tag_v_ram_0_rdata[20:1];
+assign way1_tag = tag_v_ram_1_rdata[20:1];
 
 // DIRTY
 // dirty_ram_0

@@ -86,10 +86,28 @@ reg         mdata_buf_valid;
 wire [31:0] mdata_now;
 reg  [31:0] mdata_buf;
 
+wire tlb_miss;
+wire tlb_invalid;
+wire tlb_modify;
+wire refetch;
+wire s1_index;
+wire tlbp_found;
+wire inst_tlbp;
+wire inst_tlbr;
+wire inst_tlbwi;
 
 /*  LOGIC  */
 
-assign {ms_exc_of      , //161
+assign {tlb_miss       , //173
+        tlb_invalid    , //172
+        tlb_modify     , //171
+        refetch        , //170
+        s1_index       , //169:166
+        tlbp_found     , //165
+        inst_tlbp      , //164
+        inst_tlbr      , //163
+        inst_tlbwi     , //162
+        ms_exc_of      , //161
         ms_exc_ades    , //160
         ms_exc_adel_ld , //159
         ms_exc_adel_if , //158
@@ -118,7 +136,16 @@ assign ms_mem_we = (|ms_ls_type) & ~ms_mem_re; //store
 assign ms_res_valid =~ms_inst_mfc0
                     & ms_to_ws_valid;
 
-assign ms_to_ws_bus = {ms_exc_of      , //120
+assign ms_to_ws_bus = {tlb_miss       , //132
+                       tlb_invalid    , //131
+                       tlb_modify     , //130
+                       refetch        , //129
+                       s1_index       , //128:125
+                       tlbp_found     , //124
+                       inst_tlbp      , //123
+                       inst_tlbr      , //122
+                       inst_tlbwi     , //121
+                       ms_exc_of      , //120
                        ms_exc_ades    , //119
                        ms_exc_adel_if , //118
                        ms_exc_adel_ld , //117
@@ -145,7 +172,10 @@ assign ms_ex =(ms_exc_of
              | ms_exc_adel_if
              | ms_exc_adel_ld
              | ms_exc_ades
-             | ms_inst_eret) & ms_valid;
+             | ms_inst_eret
+             | tlb_miss
+             | tlb_invalid
+             | tlb_modify) & ms_valid;
 
 assign ms_to_ds_bus = {`MS_TO_DS_BUS_WD{ ms_valid & ms_gpr_we}}
                     & {ms_res_valid,    // 37
