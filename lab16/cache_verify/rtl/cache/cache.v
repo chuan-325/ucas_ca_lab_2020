@@ -501,7 +501,7 @@ assign way1_data_bank2_wdata = (ret_valid && ret_count==2'b10) ? refill_bank_dat
 assign way1_data_bank3_wdata = (ret_valid && ret_count==2'b11) ? refill_bank_data :hw_wdata;
 //dirty
 reg way1_d[255:0];
-integer	j;
+//integer	j;
 always @(posedge clk) begin
     if (!resetn)
         for(j=0;j<256;j=j+1)
