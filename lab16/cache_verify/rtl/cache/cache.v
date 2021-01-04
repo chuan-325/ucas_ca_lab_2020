@@ -47,13 +47,13 @@ parameter OP_WRITE = 1'b1;
 // --- Request Buffer ---
 wire  [68:0]  request_buffer;
 reg   [68:0]  request_buffer_r;
-reg           op_r;
-reg   [ 7:0]  index_r;
-reg   [19:0]  tag_r;
-reg   [ 3:0]  offset_r;
-reg   [ 3:0]  wstrb_r;
-reg   [31:0]  wdata_r;
-reg   [127:0] replace_data_r;
+wire          op_r;
+wire  [ 7:0]  index_r;
+wire  [19:0]  tag_r;
+wire  [ 3:0]  offset_r;
+wire  [ 3:0]  wstrb_r;
+wire  [31:0]  wdata_r;
+wire  [127:0] replace_data_r;
 
 // --- Tag Compare ---
 wire way0_hit;
@@ -157,7 +157,7 @@ reg wr_req_flag;
 // --- STATE MACHINE ---
 // main state machine
 always@(posedge clk) begin
-    if (~resetn) begin
+    if (!resetn) begin
         cstate <= IDLE;
     end
     else begin
@@ -208,7 +208,7 @@ end
 
 //write buffer state machine
 always@(posedge clk) begin
-    if (~resetn) begin
+    if (!resetn) begin
         w_cstate <= W_IDLE;
     end
     else begin
@@ -246,7 +246,7 @@ assign { op_r,     //68
          wdata_r   //31:0
         } = request_buffer_r;
 always@(posedge clk) begin
-    if (!resten)
+    if (!resetn)
         request_buffer_r <= 0;
     else if (valid & cstate==IDLE & addr_ok)
         request_buffer_r <= request_buffer;
