@@ -357,9 +357,9 @@ assign refill_bank_wstrb = (ret_count == offset_r[3:2] & op_r==OP_WRITE)?wstrb_r
 
 //for way0
 //tag_v
-tagv way0_tagv(
+tag_v_ram way0_tagv(
     .clka(clk),
-    .ena(way0_tagv_en),
+//  .ena(way0_tagv_en),
     .wea(way0_tagv_we),
     .addra(way0_tagv_addr),
     .dina(way0_tagv_wdata),
@@ -372,33 +372,33 @@ assign way0_tagv_wdata = {tag_r,1'b1};
 assign way0_v = way0_tagv_rdata[0];
 assign way0_tag = way0_tagv_rdata[20:1];
 //data_bank
-data_bank way0_data_bank0(
+data_ram_bank way0_data_bank0(
     .clka(clk),
-    .ena(way0_data_bank0_en),
+//  .ena(way0_data_bank0_en),
     .wea(way0_data_bank0_we),
     .addra(way0_data_bank0_addr),
     .dina(way0_data_bank0_wdata),
     .douta(way0_data_bank0_rdata)
     );
-data_bank way0_data_bank1(
+data_ram_bank way0_data_bank1(
     .clka(clk),
-    .ena(way0_data_bank1_en),
+//  .ena(way0_data_bank1_en),
     .wea(way0_data_bank1_we),
     .addra(way0_data_bank1_addr),
     .dina(way0_data_bank1_wdata),
     .douta(way0_data_bank1_rdata)
     );
-data_bank way0_data_bank2(
+data_ram_bank way0_data_bank2(
     .clka(clk),
-    .ena(way0_data_bank2_en),
+//  .ena(way0_data_bank2_en),
     .wea(way0_data_bank2_we),
     .addra(way0_data_bank2_addr),
     .dina(way0_data_bank2_wdata),
     .douta(way0_data_bank2_rdata)
     );
-data_bank way0_data_bank3(
+data_ram_bank way0_data_bank3(
     .clka(clk),
-    .ena(way0_data_bank3_en),
+//  .ena(way0_data_bank3_en),
     .wea(way0_data_bank3_we),
     .addra(way0_data_bank3_addr),
     .dina(way0_data_bank3_wdata),
@@ -435,9 +435,9 @@ always @(posedge clk) begin
 end
 
 //for way1
-tagv way1_tagv(
+tag_v_ram way1_tagv(
     .clka(clk),
-    .ena(way1_tagv_en),
+//  .ena(way1_tagv_en),
     .wea(way1_tagv_we),
     .addra(way1_tagv_addr),
     .dina(way1_tagv_wdata),
@@ -450,33 +450,33 @@ assign way1_tagv_wdata = {tag_r,1'b1};
 assign way1_v = way1_tagv_rdata[0];
 assign way1_tag = way1_tagv_rdata[20:1];
 //data_bank
-data_bank way1_data_bank0(
+data_ram_bank way1_data_bank0(
     .clka(clk),
-    .ena(way1_data_bank0_en),
+//  .ena(way1_data_bank0_en),
     .wea(way1_data_bank0_we),
     .addra(way1_data_bank0_addr),
     .dina(way1_data_bank0_wdata),
     .douta(way1_data_bank0_rdata)
     );
-data_bank way1_data_bank1(
+data_ram_bank way1_data_bank1(
     .clka(clk),
-    .ena(way1_data_bank1_en),
+//  .ena(way1_data_bank1_en),
     .wea(way1_data_bank1_we),
     .addra(way1_data_bank1_addr),
     .dina(way1_data_bank1_wdata),
     .douta(way1_data_bank1_rdata)
     );
-data_bank way1_data_bank2(
+data_ram_bank way1_data_bank2(
     .clka(clk),
-    .ena(way1_data_bank2_en),
+//  .ena(way1_data_bank2_en),
     .wea(way1_data_bank2_we),
     .addra(way1_data_bank2_addr),
     .dina(way1_data_bank2_wdata),
     .douta(way1_data_bank2_rdata)
     );
-data_bank way1_data_bank3(
+data_ram_bank way1_data_bank3(
     .clka(clk),
-    .ena(way1_data_bank3_en),
+//  .ena(way1_data_bank3_en),
     .wea(way1_data_bank3_we),
     .addra(way1_data_bank3_addr),
     .dina(way1_data_bank3_wdata),
