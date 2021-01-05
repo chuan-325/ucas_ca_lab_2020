@@ -40,6 +40,10 @@ lab13/tlb_verify/testbench
 lab14/CPU_CDE_AXI/cpu132_gettrace
 lab14/CPU_CDE_AXI/soft
 lab14/CPU_CDE_AXI/Readme_First.txt
+# lab 15
+lab15/CPU_CDE_AXI/cpu132_gettrace
+lab15/CPU_CDE_AXI/soft
+lab15/CPU_CDE_AXI/Readme_First.txt
 # lab 16
 lab16/cache_verify/run_vivado
 lab16/cache_verify/testbench

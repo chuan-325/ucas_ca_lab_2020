@@ -87,7 +87,7 @@ wire ws_exc_tlbs_i;
 wire ws_exc_tlbl_if_r;
 wire ws_exc_tlbl_if_i;
 
-wire ws_exc_tlb_invalid;
+wire ws_exc_tlb_refill;
 
 reg  ws_has_int;
 wire ws_c0_has_int;
@@ -248,7 +248,10 @@ assign ws_excode = ws_exc_intr      ? `EX_INTR :
                                        5'b0;
 
 assign ws_pc_gen_exc = ws_inst_eret ? ws_c0_rdata
-                     : ws_exc_tlb_invalid  ? 32'hbfc00200
+                     : (ws_exc_intr | ws_exc_adel_if) ? 32'hbfc00380
+                     : ws_exc_tlbl_if_r  ? 32'hbfc00200
+                     : (ws_exc_tlbl_if_i | ws_exc_ri | ws_exc_of | ws_exc_bp | ws_exc_sysc | ws_exc_adel_ld | ws_exc_ades) ? 32'hbfc00380
+                     : (ws_exc_tlbl_ld_r | ws_exc_tlbs_r) ? 32'hbfc00200
                      : ws_ex        ? 32'hbfc00380
                      : to_refetch      ? ws_pc
                                     : ws_pc;
@@ -279,7 +282,7 @@ assign ws_exc_intr = ws_c0_has_int
 assign ws_exc_tlbl = ws_exc_tlbl_if_i | ws_exc_tlbl_if_r | ws_exc_tlbl_ld_i | ws_exc_tlbl_ld_r;
 assign ws_exc_tlbs = ws_exc_tlbs_i | ws_exc_tlbs_r;
 
-assign ws_exc_tlb_invalid = ws_exc_tlbl_if_i | ws_exc_tlbl_ld_i | ws_exc_tlbs_i;
+assign ws_exc_tlb_refill = ws_exc_tlbl_if_r | ws_exc_tlbl_ld_r | ws_exc_tlbs_r;
 
 regs_c0 u_reg_c0(
     .clk        (clk          ),

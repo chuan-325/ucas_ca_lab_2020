@@ -97,6 +97,7 @@ assign addr_eq_entrylo1 = (c0_addr == `CR_ENTRYLo1 );
 assign addr_eq_index    = (c0_addr == `CR_INDEX    );
 
 /* outputs */
+/*
 assign c0_rdata = {32{addr_eq_status}}         & c0_status
                 | {32{addr_eq_cause}}          & c0_cause
                 | {32{addr_eq_epc|eret_flush}} & c0_epc
@@ -107,6 +108,19 @@ assign c0_rdata = {32{addr_eq_status}}         & c0_status
                 | {32{addr_eq_entrylo0}}       & c0_entrylo0
                 | {32{addr_eq_entrylo1}}       & c0_entrylo1
                 | {32{addr_eq_index}}       & c0_index;
+*/
+
+assign c0_rdata = addr_eq_status ? c0_status
+                : addr_eq_cause  ? c0_cause
+                : (addr_eq_epc|eret_flush) ? c0_epc
+                : addr_eq_count ? c0_count
+                : addr_eq_compare ? c0_compare
+                : addr_eq_badvaddr ? c0_badvaddr
+                : addr_eq_entryhi ? c0_entryhi
+                : addr_eq_entrylo0 ? c0_entrylo0
+                : addr_eq_entrylo1 ? c0_entrylo1
+                : addr_eq_index ? c0_index
+                : 0;
 
 assign has_int = (| (c0_cause_ip & c0_status_im))
                   &  c0_status_ie

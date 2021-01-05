@@ -387,7 +387,7 @@ always @(posedge clk) begin
     end
 end
 
-assign data_sram_addr  = mapped ? {s1_pfn,{es_alu_result[11:0]}}
+assign data_sram_addr  = (mapped & ~es_exc_tlb_invalid & ~es_exc_tlb_refill) ? {s1_pfn,{es_alu_result[11:0]}}
                        : es_alu_result; //lab14 edited
 
 assign es_badvaddr = (es_exc_adel_if|es_exc_tlbl_if_r|es_exc_tlbl_if_i) ? fs_badvaddr
