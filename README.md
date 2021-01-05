@@ -28,18 +28,12 @@ Repo structure:
 |--lab16\cache_verify\rtl\cache                   [not completed]
 ```
 
-> CPU Design Environment(CDE):
->
-> - CPU_CDE:           ~lab09
->
-> - CPU_CDE_SRAM: lab10~lab12
->
-> - CPU_AXI:      lab14~lab15
->
->
-> Module Design Environment:
->
-> - tlb_verify:   lab13
->
-> - cache_verify: lab16
+**CPU Design Environment(CDE)**:
+- CPU_CDE:           ~lab09
+- CPU_CDE_SRAM: lab10~lab12
+- CPU_AXI:      lab14~lab15
+
+**Module Design Environment**:
+- tlb_verify:   lab13
+- cache_verify: lab16
 
